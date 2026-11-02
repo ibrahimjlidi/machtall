@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Cairo', sans-serif;
+  color: #233127;
+  background: #f7f9f6;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+::selection { background: #c8e6c9; color: #1b5e20; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-thumb { background: #cbd6ca; border-radius: 20px; }
+.dark body { background: #121b15; }
+.recharts-cartesian-axis-tick-value { font-family: 'Cairo', sans-serif; font-size: 11px; fill: #8a968c; }
+.recharts-legend-item-text { font-family: 'Cairo', sans-serif; font-size: 12px; }

@@ -1,0 +1,36 @@
+{
+  "name": "mashtal-ezzahi-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": [
+    "apps/api"
+  ],
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "api:dev": "npm run start:dev --workspace @mashtal/api",
+    "api:build": "npm run build --workspace @mashtal/api",
+    "db:migrate": "npm run db:migrate --workspace @mashtal/api",
+    "db:seed": "npm run db:seed --workspace @mashtal/api"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.0.5"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2",
+    "multer": "^2.5.0",
+    "path-to-regexp": "^8.4.2"
+  }
+}
