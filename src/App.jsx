@@ -11,7 +11,7 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend,
   Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { categories, stageLabels } from './data';
+import { stageLabels } from './data';
 import LoginScreen from './LoginScreen.jsx';
 import { apiRequest, clearAccessToken, getAccessToken, login, normalizeWorkspace } from './api.js';
 
@@ -76,6 +76,9 @@ const translations = {
     createOrder: 'إنشاء الطلب', print: 'طباعة', done: 'تم', confirmDelete: 'هل أنت متأكد من حذف هذا المنتج؟',
     highLoss: 'معدل فاقد مرتفع', readySoon: 'دفعات جاهزة قريباً',
     logout: 'تسجيل الخروج', loading: 'جارٍ تحميل بيانات المشتل...', batchProduct: 'صنف الشتلات الجاهزة',
+    manageCategories: 'إدارة الفئات', addCategory: 'إضافة فئة', editCategory: 'تعديل الفئة',
+    categoryInUse: 'لا يمكن حذف فئة تحتوي على منتجات. انقل المنتجات إلى فئة أخرى أولاً.',
+    categorySaved: 'تم حفظ الفئة', categoryDeleted: 'تم حذف الفئة',
   },
   fr: {
     dashboard: 'Tableau de bord', products: 'Produits', movements: 'Mouvements',
@@ -137,6 +140,10 @@ const translations = {
     createOrder: 'Créer commande', print: 'Imprimer', done: 'Terminé', confirmDelete: 'Supprimer ce produit ?',
     highLoss: 'Taux de perte élevé', readySoon: 'Lots bientôt prêts',
     logout: 'Déconnexion', loading: 'Chargement des données...', batchProduct: 'Produit à stocker',
+    manageCategories: 'Gérer les catégories', addCategory: 'Ajouter une catégorie',
+    editCategory: 'Modifier la catégorie',
+    categoryInUse: 'Impossible de supprimer une catégorie contenant des produits. Réaffectez-les d’abord.',
+    categorySaved: 'Catégorie enregistrée', categoryDeleted: 'Catégorie supprimée',
   },
 };
 
@@ -202,6 +209,7 @@ export default function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const [mobileNav, setMobileNav] = useState(false);
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [movements, setMovements] = useState([]);
   const [batches, setBatches] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -228,11 +236,14 @@ export default function App() {
   const [movementFilter, setMovementFilter] = useState('');
   const [productView, setProductView] = useState('table');
   const t = (key) => translations[language][key] || key;
-  const categoryLabel = (category) => language === 'fr' ? frenchCategoryLabels[category] || category : category;
+  const categoryLabel = (nameAr) => {
+    const category = categories.find((item) => item.nameAr === nameAr);
+    return language === 'fr' ? category?.nameFr || frenchCategoryLabels[nameAr] || nameAr : nameAr;
+  };
   const isRtl = language === 'ar';
 
   const refreshWorkspace = async (token = getAccessToken()) => {
-    const [productsData, movementsData, batchesData, ordersData, customersData, suppliersData, salesData] = await Promise.all([
+    const [productsData, movementsData, batchesData, ordersData, customersData, suppliersData, salesData, categoriesData] = await Promise.all([
       apiRequest('/products', { token }),
       apiRequest('/movements', { token }),
       apiRequest('/production/batches', { token }),
@@ -240,12 +251,14 @@ export default function App() {
       apiRequest('/customers', { token }),
       apiRequest('/suppliers', { token }),
       apiRequest('/sales', { token }),
+      apiRequest('/categories', { token }),
     ]);
     const data = normalizeWorkspace({
       products: productsData, movements: movementsData, batches: batchesData,
       orders: ordersData, customers: customersData, suppliers: suppliersData, sales: salesData,
     });
     setProducts(data.products);
+    setCategories(categoriesData);
     setMovements(data.movements);
     setBatches(data.batches);
     setOrders(data.orders);
@@ -259,6 +272,7 @@ export default function App() {
       clearAccessToken();
       setUser(null);
       setProducts([]);
+      setCategories([]);
       setMovements([]);
       setDataError('انتهت صلاحية الجلسة. سجّل الدخول مجدداً.');
     };
@@ -328,6 +342,7 @@ export default function App() {
       clearAccessToken();
       setUser(null);
       setProducts([]);
+      setCategories([]);
       setMovements([]);
       setBatches([]);
       setCustomers([]);
@@ -433,6 +448,20 @@ export default function App() {
   };
 
   const openProductForm = (product = null) => setModal({ type: 'product', product });
+  const saveCategory = async (data) => {
+    const id = data.id;
+    await apiRequest(id ? `/categories/${id}` : '/categories', {
+      method: id ? 'PATCH' : 'POST',
+      body: { nameAr: data.nameAr.trim(), nameFr: data.nameFr.trim() },
+    });
+    await refreshWorkspace();
+    notify(t('categorySaved'));
+  };
+  const deleteCategory = async (category) => {
+    await apiRequest(`/categories/${category.id}`, { method: 'DELETE' });
+    await refreshWorkspace();
+    notify(t('categoryDeleted'));
+  };
   const saveProduct = async (data) => {
     const required = ['nameAr', 'nameFr', 'category', 'size', 'purchasePrice', 'salePrice', 'minimum', 'location'];
     if (required.some((key) => !String(data[key] ?? '').trim()) || Number(data.salePrice) < 0 || Number(data.purchasePrice) < 0) {
@@ -607,7 +636,7 @@ export default function App() {
       return { day: date.toLocaleDateString(isRtl ? 'ar-TN' : 'fr-TN', { day: 'numeric', month: 'short' }), inbound: slice.filter((m) => m.type.endsWith('IN')).reduce((n, m) => n + m.quantity, 0), outbound: slice.filter((m) => m.type.endsWith('OUT')).reduce((n, m) => n + m.quantity, 0) };
     });
     const catData = categories.map((category) => ({
-      name: categoryLabel(category), value: products.filter((p) => p.category === category).reduce((sum, p) => sum + getQty(p.id) * p.purchasePrice, 0),
+      name: categoryLabel(category.nameAr), value: products.filter((p) => p.category === category.nameAr).reduce((sum, p) => sum + getQty(p.id) * p.purchasePrice, 0),
     })).filter((item) => item.value > 0).sort((a, b) => b.value - a.value).slice(0, 6);
     const salesData = [
       { month: isRtl ? 'جانفي' : 'Janv.', sales: 3250 }, { month: isRtl ? 'فيفري' : 'Févr.', sales: 4180 }, { month: isRtl ? 'مارس' : 'Mars', sales: 7620 },
@@ -653,11 +682,11 @@ export default function App() {
   };
 
   const renderProducts = () => <div className="space-y-5">
-    <PageHeading title={t('products')} subtitle={`${products.length} ${t('productsUnit')} · ${t('inStock')} ${products.reduce((sum, p) => sum + getQty(p.id), 0).toLocaleString('fr-TN')}`} action={<button onClick={() => openProductForm()} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><Plus size={17} />{t('addProduct')}</button>} />
+    <PageHeading title={t('products')} subtitle={`${products.length} ${t('productsUnit')} · ${t('inStock')} ${products.reduce((sum, p) => sum + getQty(p.id), 0).toLocaleString('fr-TN')}`} action={<div className="flex flex-wrap gap-2">{user.role === 'ADMIN' && <button onClick={() => setModal({ type: 'categories' })} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-white"><Settings2 size={16} />{t('manageCategories')}</button>}<button onClick={() => openProductForm()} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><Plus size={17} />{t('addProduct')}</button></div>} />
     <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800">
       <div className="flex flex-wrap gap-2">
         <label className="relative min-w-[220px] flex-1"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 rtl:right-3 ltr:left-3" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('searchProducts')} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pe-9 ps-3 text-xs outline-none focus:border-green-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" /></label>
-        <select value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-white"><option value="">{t('allCategories')}</option>{categories.map((category) => <option key={category} value={category}>{categoryLabel(category)}</option>)}</select>
+        <select aria-label={t('allCategories')} value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-white"><option value="">{t('allCategories')}</option>{categories.map((category) => <option key={category.id} value={category.nameAr}>{categoryLabel(category.nameAr)}</option>)}</select>
         <select value={productSize} onChange={(e) => setProductSize(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-white"><option value="">{t('allSizes')}</option>{[...new Set(products.map((p) => p.size))].map((size) => <option key={size}>{size}</option>)}</select>
         <select value={productStatus} onChange={(e) => setProductStatus(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-white"><option value="">{t('allStatuses')}</option><option value="available">{t('available')}</option><option value="low">{t('low')}</option><option value="out">{t('out')}</option></select>
         <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-700"><button onClick={() => setProductView('table')} className={`rounded-lg px-3 text-xs font-bold ${productView === 'table' ? 'bg-white text-forest shadow-sm dark:bg-slate-600' : 'text-slate-500'}`}>{t('table')}</button><button onClick={() => setProductView('cards')} className={`rounded-lg px-3 text-xs font-bold ${productView === 'cards' ? 'bg-white text-forest shadow-sm dark:bg-slate-600' : 'text-slate-500'}`}>{t('cards')}</button></div>
@@ -837,6 +866,7 @@ export default function App() {
       </div>
     </div>
     {modal?.type === 'product' && <ProductForm product={modal.product} categories={categories} categoryLabel={categoryLabel} t={t} onClose={() => setModal(null)} onSave={saveProduct} />}
+    {modal?.type === 'categories' && <CategoryManager categories={categories} t={t} onClose={() => setModal(null)} onSave={saveCategory} onDelete={deleteCategory} />}
     {modal?.type === 'movement' && <MovementForm products={products} productById={productById} getQty={getQty} seedType={modal.seedType} t={t} onClose={() => setModal(null)} onSave={addMovement} />}
     {modal?.type === 'sale' && <SaleForm products={products} customers={customers} getQty={getQty} t={t} onClose={() => setModal(null)} onSave={submitSale} />}
     {modal?.type === 'batch' && <BatchForm products={products} t={t} onClose={() => setModal(null)} onSave={createBatch} />}
@@ -936,16 +966,78 @@ function FormActions({ onClose, t, submitLabel }) {
 }
 
 function ProductForm({ product, categories, categoryLabel, t, onClose, onSave }) {
-  const [form, setForm] = useState(product || { nameAr: '', nameFr: '', scientific: '', category: categories[0], size: '3L', purchasePrice: '', salePrice: '', minimum: 10, location: 'مشتل 1', image: '', initialQuantity: '' });
+  const [form, setForm] = useState(product || { nameAr: '', nameFr: '', scientific: '', category: categories[0]?.nameAr || '', size: '3L', purchasePrice: '', salePrice: '', minimum: 10, location: 'مشتل 1', image: '', initialQuantity: '' });
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   return <Modal title={product ? `${t('edit')} ${t('product')}` : t('addProduct')} onClose={onClose} wide><form onSubmit={(event) => { event.preventDefault(); onSave(form); }}><div className="grid gap-4 sm:grid-cols-2">
     <Field label={t('nameAr')}><input required value={form.nameAr} onChange={update('nameAr')} className={inputClass} /></Field><Field label={t('nameFr')}><input required value={form.nameFr} onChange={update('nameFr')} className={inputClass} /></Field>
-    <Field label={t('scientific')}><input value={form.scientific || ''} onChange={update('scientific')} className={inputClass} /></Field><Field label={t('category')}><select value={form.category} onChange={update('category')} className={selectClass}>{categories.map((category) => <option key={category} value={category}>{categoryLabel(category)}</option>)}</select></Field>
+    <Field label={t('scientific')}><input value={form.scientific || ''} onChange={update('scientific')} className={inputClass} /></Field><Field label={t('category')}><select required disabled={!categories.length} value={form.category || ''} onChange={update('category')} className={selectClass}>{categories.map((category) => <option key={category.id} value={category.nameAr}>{categoryLabel(category.nameAr)}</option>)}</select></Field>
     <Field label={t('size')}><select value={form.size} onChange={update('size')} className={selectClass}>{['1L', '3L', '10L', '20L', 'صينية', 'قطعة', 'كيس', 'ظرف'].map((size) => <option key={size}>{size}</option>)}</select></Field><Field label={t('location')}><select value={form.location} onChange={update('location')} className={selectClass}>{['مشتل 1', 'مشتل 2', 'بيت الظل', 'الساحة A', 'الساحة B', 'المخزن'].map((location) => <option key={location}>{location}</option>)}</select></Field>
     <Field label={t('purchasePrice')}><input required type="number" step="0.001" min="0" value={form.purchasePrice} onChange={update('purchasePrice')} className={inputClass} /></Field><Field label={t('salePrice')}><input required type="number" step="0.001" min="0" value={form.salePrice} onChange={update('salePrice')} className={inputClass} /></Field>
     <Field label={t('minStock')}><input required type="number" min="0" value={form.minimum} onChange={update('minimum')} className={inputClass} /></Field>{!product && <Field label={`${t('quantity')} · رصيد افتتاحي`}><input type="number" min="0" value={form.initialQuantity} onChange={update('initialQuantity')} className={inputClass} /></Field>}
     <Field label={t('imageUrl')} className={!product ? '' : 'sm:col-span-2'}><input value={form.image || ''} onChange={update('image')} className={inputClass} dir="ltr" /></Field>
   </div><FormActions onClose={onClose} t={t} /></form></Modal>;
+}
+
+function CategoryManager({ categories, t, onClose, onSave, onDelete }) {
+  const [form, setForm] = useState({ nameAr: '', nameFr: '' });
+  const [editing, setEditing] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      await onSave({ ...form, id: editing?.id });
+      if (!editing) setForm({ nameAr: '', nameFr: '' });
+      setEditing(null);
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const startEditing = (category) => {
+    setEditing(category);
+    setForm({ nameAr: category.nameAr, nameFr: category.nameFr });
+    setError('');
+  };
+  const remove = async (category) => {
+    setError('');
+    try {
+      await onDelete(category);
+      if (editing?.id === category.id) {
+        setEditing(null);
+        setForm({ nameAr: '', nameFr: '' });
+      }
+    } catch (deleteError) {
+      setError(deleteError.message);
+    }
+  };
+
+  return <Modal title={t('manageCategories')} onClose={onClose}>
+    <form onSubmit={submit} className="mb-5 rounded-2xl bg-slate-50 p-4 dark:bg-slate-700/50">
+      <h3 className="mb-3 text-sm font-extrabold text-slate-700 dark:text-white">{editing ? t('editCategory') : t('addCategory')}</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label={t('nameAr')}><input required minLength="2" maxLength="80" value={form.nameAr} onChange={update('nameAr')} className={inputClass} /></Field>
+        <Field label={t('nameFr')}><input required minLength="2" maxLength="80" value={form.nameFr} onChange={update('nameFr')} className={inputClass} dir="ltr" /></Field>
+      </div>
+      {error && <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{error}</p>}
+      <div className="mt-4 flex justify-end gap-2">
+        {editing && <button type="button" onClick={() => { setEditing(null); setForm({ nameAr: '', nameFr: '' }); setError(''); }} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500">{t('cancel')}</button>}
+        <button type="submit" disabled={busy} className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{busy ? t('loading') : editing ? t('save') : t('addCategory')}</button>
+      </div>
+    </form>
+    <div className="max-h-72 space-y-2 overflow-y-auto">
+      {categories.map((category) => <div key={category.id} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 dark:border-slate-700">
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-slate-700 dark:text-white">{category.nameAr}</p><p dir="ltr" className="truncate text-xs text-slate-400">{category.nameFr}</p></div>
+        <button type="button" aria-label={`${t('editCategory')} ${category.nameAr}`} onClick={() => startEditing(category)} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 dark:bg-slate-700 dark:text-white">{t('edit')}</button>
+        <button type="button" aria-label={`${t('delete')} ${category.nameAr}`} onClick={() => remove(category)} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{t('delete')}</button>
+      </div>)}
+      {!categories.length && <Empty text={t('noResults')} />}
+    </div>
+  </Modal>;
 }
 
 function movementTypeLabel(type, t) {

@@ -64,7 +64,32 @@ async function run() {
     assert.equal(typeof dashboard[metric], 'number', `dashboard.${metric} should be numeric`);
   }
 
-  const category = categories[0].nameAr;
+  const defaultCategory = categories[0];
+  const { payload: createdCategory } = await request('/categories', {
+    method: 'POST',
+    cookie: adminCookie,
+    body: { nameAr: 'فئة الاختبار', nameFr: 'Catégorie test' },
+  });
+  assert.equal(createdCategory.nameAr, 'فئة الاختبار');
+  await request('/categories', {
+    method: 'POST',
+    cookie: adminCookie,
+    body: { nameAr: '   ', nameFr: '   ' },
+    expected: 400,
+  });
+  await request('/categories', {
+    method: 'POST',
+    cookie: adminCookie,
+    body: { nameAr: 'فئة الاختبار', nameFr: 'Autre nom' },
+    expected: 409,
+  });
+  const { payload: updatedCategory } = await request(`/categories/${createdCategory.id}`, {
+    method: 'PATCH',
+    cookie: adminCookie,
+    body: { nameAr: 'فئة اختبار محدثة', nameFr: 'Catégorie test modifiée' },
+  });
+  assert.equal(updatedCategory.nameFr, 'Catégorie test modifiée');
+  const category = updatedCategory.nameAr;
   const { payload: testProduct } = await request('/products', {
     method: 'POST',
     cookie: adminCookie,
@@ -89,7 +114,9 @@ async function run() {
   });
   assert.equal(updatedProduct.nameFr, 'Produit test modifié');
   assert.equal(updatedProduct.minimum, 2);
+  assert.equal(updatedProduct.category, category);
   await request(`/products/${testProduct.id}`, { method: 'DELETE', cookie: adminCookie, expected: 409 });
+  await request(`/categories/${createdCategory.id}`, { method: 'DELETE', cookie: adminCookie, expected: 409 });
 
   await request('/movements', {
     method: 'POST',
@@ -211,7 +238,7 @@ async function run() {
       sku: `E2E-EMPTY-${Date.now()}`,
       nameAr: 'منتج أرشفة اختبار',
       nameFr: 'Produit à archiver',
-      category,
+      category: defaultCategory.nameAr,
       size: 'قطعة',
       purchasePrice: 1,
       salePrice: 2,
@@ -225,6 +252,14 @@ async function run() {
   });
   assert.equal(archived.success, true);
   assert.ok(!(await request('/products', { cookie: adminCookie })).payload.some((item) => item.id === emptyProduct.id));
+  const { payload: reassignedProduct } = await request(`/products/${testProduct.id}`, {
+    method: 'PATCH',
+    cookie: adminCookie,
+    body: { category: defaultCategory.nameAr },
+  });
+  assert.equal(reassignedProduct.category, defaultCategory.nameAr);
+  assert.equal((await request(`/categories/${createdCategory.id}`, { method: 'DELETE', cookie: adminCookie })).payload.success, true);
+  assert.ok(!(await request('/categories', { cookie: adminCookie })).payload.some((item) => item.id === createdCategory.id));
 
   await request(`/users/${admin.id}`, { method: 'PATCH', cookie: adminCookie, body: { active: false }, expected: 400 });
 
@@ -241,6 +276,12 @@ async function run() {
   await request('/users', { method: 'POST', cookie: adminCookie, body: { name: 'Duplicate', email: adminEmail, password: 'feature-test-password-2026', role: 'VIEWER' }, expected: 409 });
   const { cookie: oldStaffCookie } = await login(email, 'feature-test-password-2026');
   await request('/users', { cookie: oldStaffCookie, expected: 403 });
+  await request('/categories', {
+    method: 'POST',
+    cookie: oldStaffCookie,
+    body: { nameAr: 'غير مسموح', nameFr: 'Interdit' },
+    expected: 403,
+  });
   await request('/products', {
     method: 'POST',
     cookie: oldStaffCookie,
