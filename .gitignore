@@ -6,4 +6,6 @@ apps/api/.env
 .env.*
 !.env.example
 coverage/
+test-results/
+playwright-report/
 *.tsbuildinfo

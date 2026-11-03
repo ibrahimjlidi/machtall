@@ -1,0 +1,7 @@
+services:
+  db:
+    networks:
+      - private
+      - ingress
+    ports:
+      - "127.0.0.1:${TEST_DB_PORT:-15432}:5432"

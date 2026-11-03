@@ -86,6 +86,56 @@ npm run dev
 
 Vite proxies `/api` to `http://localhost:3000` (override with `API_PROXY_TARGET` if necessary). The demo seed also requires `SEED_ADMIN_PASSWORD`; set `SEED_ADMIN_EMAIL` if you want a different owner login.
 
+### Tests
+
+```sh
+npm run test:unit
+npx playwright install --with-deps chromium
+npm run test:ui
+```
+
+The unit tests use Node's test runner. Playwright starts Vite and stubs the login API, so UI tests do not need a database or real user credentials.
+
+The API end-to-end suite exercises every API module: authentication and session handling, dashboard, categories/suppliers, product creation/update/archive, movements and transfers, production batches, purchase-order send/receive, sales/customer payments, reports, and user administration. It checks role restrictions, validation failures, duplicate transitions, and persisted outcomes. It **mutates data** and must only be run against a separate, disposable, migrated, seeded test database. For isolation, start one with the test-only Compose override:
+
+```sh
+export POSTGRES_DB=mashtal_e2e
+export POSTGRES_USER=mashtal_e2e
+export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+export JWT_ACCESS_SECRET="$(openssl rand -hex 48)"
+export SEED_ADMIN_EMAIL=owner@e2e.test
+export SEED_ADMIN_PASSWORD="$(openssl rand -hex 12)"
+export COOKIE_SECURE=false
+export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:15432/${POSTGRES_DB}?schema=public"
+docker compose -p mashtal-e2e -f compose.yaml -f compose.test.yaml up -d db
+npm run db:migrate
+npm run db:seed
+
+# In a second terminal, set the same DATABASE_URL and JWT_ACCESS_SECRET values:
+npm run api:dev
+
+ALLOW_TEST_DATA_MUTATION=true \
+API_BASE_URL=http://localhost:3000/api \
+TEST_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
+TEST_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+npm run test:e2e
+
+docker compose -p mashtal-e2e -f compose.yaml -f compose.test.yaml down --volumes --remove-orphans
+```
+
+Never point this test at production or a database containing business data. The test refuses to run unless `ALLOW_TEST_DATA_MUTATION=true` is set explicitly.
+
+GitHub Actions runs unit tests, the API end-to-end suite, both production builds, and Playwright UI tests on pushes to `main` and pull requests targeting `main`. The Playwright suite checks login errors, admin navigation through all application sections, logout, and role-sensitive navigation; its API responses are stubbed so it does not depend on database contents.
+
+To prevent a pull request from merging when any CI check fails, configure GitHub branch protection for `main`:
+
+1. Open **Settings → Branches → Add branch protection rule** (or create a repository ruleset targeting `main`).
+2. Enable **Require a pull request before merging**.
+3. Enable **Require status checks to pass before merging** and select **Regression tests**.
+4. If the policy must apply to administrators too, do not enable an administrator bypass.
+
+The workflow runs on pull requests targeting `main` and on pushes to `main`. GitHub branch protection is a repository setting; adding the workflow alone does not block merges.
+
 ## API and access control
 
 All routes except `POST /api/auth/login` and `GET /api/health` require an active authenticated session. Login issues an HTTP-only, SameSite=Strict cookie scoped to `/api`; logout clears it. The API checks that a user remains active and that the token has not been invalidated on every request. Passwords are bcrypt-hashed. DTO validation rejects unknown fields and malformed quantities.

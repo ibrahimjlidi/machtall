@@ -10,6 +10,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "test:unit": "node --import tsx --test test/unit/*.test.ts",
+    "test:e2e": "node test/feature-smoke.mjs",
     "test:features": "node test/feature-smoke.mjs"
   },
   "dependencies": {

@@ -12,8 +12,12 @@
     "preview": "vite preview --host 0.0.0.0",
     "api:dev": "npm run start:dev --workspace @mashtal/api",
     "api:build": "npm run build --workspace @mashtal/api",
+    "db:generate": "npm run db:generate --workspace @mashtal/api",
     "db:migrate": "npm run db:migrate --workspace @mashtal/api",
-    "db:seed": "npm run db:seed --workspace @mashtal/api"
+    "db:seed": "npm run db:seed --workspace @mashtal/api",
+    "test:unit": "npm run test:unit --workspace @mashtal/api",
+    "test:e2e": "npm run test:e2e --workspace @mashtal/api",
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -22,6 +26,7 @@
     "recharts": "^2.15.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
