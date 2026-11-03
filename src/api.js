@@ -97,6 +97,7 @@ export function normalizeWorkspace({ products, movements, batches, orders, custo
     suppliers,
     sales: sales.map((sale) => ({
       ...sale,
+      recordId: sale.id,
       id: sale.code,
       payment: sale.payment.toLowerCase(),
     })),

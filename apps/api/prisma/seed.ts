@@ -28,7 +28,7 @@ const seedProductSku = (productId: string) => initialProducts.find((product) => 
 
 async function seed() {
   const password = process.env.SEED_ADMIN_PASSWORD;
-  if (!password || password.length < 12) {
+  if (!password || password.length < 12 || /replace[-_ ]?with|change[-_ ]?me|placeholder|example/i.test(password)) {
     throw new Error('SEED_ADMIN_PASSWORD must be set to a unique password of at least 12 characters');
   }
   const email = (process.env.SEED_ADMIN_EMAIL || 'owner@mashtal.tn').toLowerCase();

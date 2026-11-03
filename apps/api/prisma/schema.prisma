@@ -53,12 +53,14 @@ model User {
   name         String
   email        String              @unique
   passwordHash String
+  authVersion  Int                 @default(0)
   role         UserRole            @default(VIEWER)
   active       Boolean             @default(true)
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   movements    InventoryMovement[]
   sales        Sale[]
+  recordedPayments CustomerPayment[]
 }
 
 model Category {
@@ -119,6 +121,7 @@ model Customer {
   active        Boolean      @default(true)
   createdAt     DateTime     @default(now())
   sales         Sale[]
+  payments      CustomerPayment[]
 }
 
 model InventoryMovement {
@@ -197,9 +200,35 @@ model Sale {
   createdById String?
   createdBy   User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
   lines       SaleLine[]
+  paymentAllocations CustomerPaymentAllocation[]
 
   @@index([customerId, createdAt])
   @@index([createdAt])
+}
+
+model CustomerPayment {
+  id           String                     @id @default(cuid())
+  customerId   String
+  customer     Customer                   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  amount       Decimal                    @db.Decimal(12, 3)
+  note         String?
+  receivedAt   DateTime                   @default(now())
+  recordedById String?
+  recordedBy   User?                      @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  allocations  CustomerPaymentAllocation[]
+
+  @@index([customerId, receivedAt])
+}
+
+model CustomerPaymentAllocation {
+  id        String          @id @default(cuid())
+  paymentId String
+  payment   CustomerPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  saleId    String?
+  sale      Sale?           @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  amount    Decimal         @db.Decimal(12, 3)
+
+  @@index([saleId])
 }
 
 model SaleLine {

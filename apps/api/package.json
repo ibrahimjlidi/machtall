@@ -9,7 +9,8 @@
     "start:dev": "nest start --watch",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "test:features": "node test/feature-smoke.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

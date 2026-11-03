@@ -1,11 +1,13 @@
 # 12 — Review inventory, movements, and reports
 
-**Result: PASS for viewing; exports have demo limitations** · Executed 2026-11-02  
+**Historical result: PASS for viewing; exports had demo limitations** · Executed 2026-11-02
 **Verification:** Authenticated API checks and Arabic browser UI
+
+> This is a dated record of the 2026-11-02 demo. On 2026-11-03 the report page was changed to load persisted report data, download an Excel-compatible CSV, and open a printable PDF view. Those newer behaviors require a fresh verification after the database migration and deployment.
 
 ## Purpose
 
-Confirm that inventory valuation and movement history are available for review, and distinguish implemented report views from presentation-only export controls.
+Confirm that inventory valuation and movement history are available for review, and distinguish implemented report views from presentation-only export controls at the time of this test.
 
 ## Project flow
 
@@ -15,7 +17,7 @@ flowchart LR
         USER([Admin / Viewer]) --> PAGE["Dashboard + Reports<br/>src/App.jsx"]
         PAGE --> CLIENT["API client<br/>src/api.js"]
         PAGE --> SUMMARY["UI valuation table<br/>and report cards"]
-        EXPORT["Excel / PDF buttons"]
+        EXPORT["Excel / PDF buttons (as tested)"]
     end
     subgraph BACKEND["Backend · NestJS"]
         DASHBOARD["DashboardController"]
@@ -42,7 +44,7 @@ flowchart LR
     PRODUCT --> SUMMARY
     STOCK --> SUMMARY
     SALE --> SUMMARY
-    EXPORT --> MOCK["Demo toast only<br/>no export endpoint"]
+    EXPORT --> MOCK["Demo toast only<br/>as tested on 2026-11-02"]
     SUMMARY --> RESULT["Current inventory view<br/>not formal accounting"]
     classDef actor fill:#eef7ef,stroke:#2e7d32,color:#18351b
     classDef ui fill:#e8f5e9,stroke:#2e7d32,color:#18351b
@@ -60,9 +62,9 @@ flowchart LR
 
 | Layer | Location | Responsibility in this test |
 |---|---|---|
-| UI | [`src/App.jsx`](../../../src/App.jsx) | Displays valuation/history summaries; export controls are local demo handlers |
-| API reads | [`dashboard.module.ts`](../../../apps/api/src/dashboard/dashboard.module.ts), products/movements/sales services | Return persisted summary inputs |
-| Data model | [`schema.prisma`](../../../apps/api/prisma/schema.prisma) | Products, movements, sales, and sale lines |
+| UI | [`src/App.jsx`](../../../src/App.jsx) | Displays the report page and export controls |
+| API reads | [`reports.service.ts`](../../../apps/api/src/reports/reports.service.ts), dashboard, products/movements/sales services | Return persisted summary and date-filtered report inputs |
+| Data model | [`schema.prisma`](../../../apps/api/prisma/schema.prisma) | Products, movements, sales, payments, and sale lines |
 | Stock math | [`stock.ts`](../../../apps/api/src/common/stock.ts) | Converts movements to on-hand quantities |
 | Architecture | [`architecture.md`](../../architecture.md) | Explains presentation versus API/data responsibilities |
 
@@ -84,14 +86,14 @@ flowchart LR
 - Dashboard summary loads successfully.
 - Movement history shows the product's recorded stock operations.
 - Reports page presents the current inventory valuation and report summaries.
-- Any mock-only export behavior is identified rather than mistaken for a generated report.
+- At the time of this dated test, any mock-only export behavior is identified rather than mistaken for a generated report.
 
 ## Actual result
 
-The dashboard returned numeric valuation and alert metrics. History contained **13 movements** for the primary test product, including purchase, production, sale, loss, adjustment, and transfer. The browser rendered the inventory valuation table and report cards. Both export buttons displayed demo confirmation toasts. **PASS for viewing.**
+The dashboard returned numeric valuation and alert metrics. History contained **13 movements** for the primary test product, including purchase, production, sale, loss, adjustment, and transfer. The browser rendered the inventory valuation table and report cards. Both export buttons displayed demo confirmation toasts. **PASS for viewing on the execution date.**
 
 ## Limitations
 
-- Excel/PDF controls do **not** generate or download files; they only show confirmation messages.
+- On the execution date, Excel/PDF controls did **not** generate or download files; they only showed confirmation messages.
 - Seasonal sales and some report summaries contain presentation/demo data and were not reconciled against formal accounting records.
 - Do not use these views as official financial statements.

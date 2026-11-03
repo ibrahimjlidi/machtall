@@ -3,7 +3,7 @@ import {
   Activity, AlertTriangle, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Bell,
   Boxes, Building2, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight,
   CircleHelp, ClipboardList, CreditCard, Download, FileSpreadsheet, Flower2,
-  Globe2, LayoutDashboard, Leaf, Menu, Moon, MoreHorizontal, Package, Plus,
+  Globe2, KeyRound, LayoutDashboard, Leaf, Menu, Moon, MoreHorizontal, Package, Plus,
   Search, Settings2, ShieldCheck, ShoppingBag, ShoppingCart, Sun, Tag, Truck,
   UserRound, Users, Wallet, X, LogOut,
 } from 'lucide-react';
@@ -62,6 +62,17 @@ const translations = {
     day: 'اليوم', week: 'هذا الأسبوع', allLocations: 'كل المواقع', greenhouse: 'مشتل',
     noImage: 'نبات', actionsSoon: 'قريباً', rows: 'حركة', salesUnit: 'عملية',
     creditBalance: 'الرصيد الآجل', customers: 'العملاء', orders: 'الطلبات',
+    paidAmount: 'المبلغ المدفوع', remaining: 'المتبقي', collectPayment: 'تسجيل دفعة',
+    paymentAmount: 'مبلغ الدفعة', paymentNote: 'ملاحظة (اختياري)', recordPayment: 'تأكيد استلام الدفعة',
+    paymentHistory: 'سجل الدفعات',
+    reportFrom: 'من تاريخ', reportTo: 'إلى تاريخ', exportCsv: 'تنزيل Excel (CSV)',
+    reportSales: 'إجمالي المبيعات', reportCount: 'عدد المبيعات', reportStock: 'قيمة المخزون',
+    reportLoss: 'وحدات الفاقد', reportCredit: 'الرصيد الآجل المفتوح', reportInventory: 'المخزون الحالي',
+    reportLoading: 'جارٍ إعداد التقرير...', reportError: 'تعذر تحميل بيانات التقرير',
+    userName: 'الاسم', userEmail: 'البريد الإلكتروني', initialPassword: 'كلمة مرور أولية (12 حرفاً على الأقل)',
+    createUser: 'إضافة مستخدم', updateUser: 'تحديث المستخدم', resetPassword: 'إعادة تعيين كلمة المرور',
+    resetPasswordFor: 'تعيين كلمة مرور جديدة', activeUser: 'نشط', inactiveUser: 'موقوف',
+    createdAt: 'تاريخ الإنشاء', userActions: 'إجراءات المستخدم', passwordResetHint: 'عيّن كلمة مرور مؤقتة وشاركها مع المستخدم بأمان.',
     createOrder: 'إنشاء الطلب', print: 'طباعة', done: 'تم', confirmDelete: 'هل أنت متأكد من حذف هذا المنتج؟',
     highLoss: 'معدل فاقد مرتفع', readySoon: 'دفعات جاهزة قريباً',
     logout: 'تسجيل الخروج', loading: 'جارٍ تحميل بيانات المشتل...', batchProduct: 'صنف الشتلات الجاهزة',
@@ -112,6 +123,17 @@ const translations = {
     day: "Aujourd'hui", week: 'Cette semaine', allLocations: 'Tous emplacements', greenhouse: 'Serre',
     noImage: 'Plante', actionsSoon: 'Bientôt', rows: 'mouvements', salesUnit: 'ventes',
     creditBalance: 'Solde crédit', customers: 'Clients', orders: 'Commandes',
+    paidAmount: 'Montant payé', remaining: 'Solde restant', collectPayment: 'Enregistrer un paiement',
+    paymentAmount: 'Montant du paiement', paymentNote: 'Note (facultative)', recordPayment: 'Confirmer le paiement',
+    paymentHistory: 'Historique des paiements',
+    reportFrom: 'Du', reportTo: 'Au', exportCsv: 'Télécharger Excel (CSV)',
+    reportSales: 'Ventes totales', reportCount: 'Nombre de ventes', reportStock: 'Valeur du stock',
+    reportLoss: 'Unités perdues', reportCredit: 'Crédit restant', reportInventory: 'Stock actuel',
+    reportLoading: 'Préparation du rapport...', reportError: 'Impossible de charger le rapport',
+    userName: 'Nom', userEmail: 'Adresse e-mail', initialPassword: 'Mot de passe initial (12 caractères minimum)',
+    createUser: 'Ajouter un utilisateur', updateUser: "Modifier l'utilisateur", resetPassword: 'Réinitialiser le mot de passe',
+    resetPasswordFor: 'Définir un nouveau mot de passe', activeUser: 'Actif', inactiveUser: 'Désactivé',
+    createdAt: 'Créé le', userActions: 'Actions', passwordResetHint: 'Définissez un mot de passe temporaire et communiquez-le de manière sécurisée.',
     createOrder: 'Créer commande', print: 'Imprimer', done: 'Terminé', confirmDelete: 'Supprimer ce produit ?',
     highLoss: 'Taux de perte élevé', readySoon: 'Lots bientôt prêts',
     logout: 'Déconnexion', loading: 'Chargement des données...', batchProduct: 'Produit à stocker',
@@ -186,6 +208,13 @@ export default function App() {
   const [suppliers, setSuppliers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [sales, setSales] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [paymentHistoryFor, setPaymentHistoryFor] = useState(null);
+  const [usersError, setUsersError] = useState('');
+  const [reportData, setReportData] = useState(null);
+  const [reportError, setReportError] = useState('');
+  const [reportFrom, setReportFrom] = useState(() => new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10));
+  const [reportTo, setReportTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [user, setUser] = useState(null);
   const [appLoading, setAppLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
@@ -255,6 +284,26 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (activePage !== 'reports' || !user) return undefined;
+    let active = true;
+    setReportError('');
+    apiRequest(`/reports?from=${encodeURIComponent(reportFrom)}&to=${encodeURIComponent(reportTo)}`)
+      .then((report) => { if (active) setReportData(report); })
+      .catch((error) => { if (active) setReportError(error.message); });
+    return () => { active = false; };
+  }, [activePage, reportFrom, reportTo, user]);
+
+  useEffect(() => {
+    if (activePage !== 'users' || user?.role !== 'ADMIN') return undefined;
+    let active = true;
+    setUsersError('');
+    apiRequest('/users')
+      .then((data) => { if (active) setUsers(data); })
+      .catch((error) => { if (active) setUsersError(error.message); });
+    return () => { active = false; };
+  }, [activePage, user]);
+
   const handleLogin = async (email, password) => {
     const profile = await login(email, password);
     setDataLoading(true);
@@ -285,6 +334,8 @@ export default function App() {
       setSuppliers([]);
       setOrders([]);
       setSales([]);
+      setUsers([]);
+      setReportData(null);
       setActivePage('dashboard');
     }
   };
@@ -301,6 +352,54 @@ export default function App() {
   const monthlyLoss = movements.filter((m) => m.type === 'Loss OUT' && m.date.slice(0, 7) === new Date().toISOString().slice(0, 7)).reduce((sum, m) => sum + m.quantity, 0);
   const navigate = (page) => { setActivePage(page); setMobileNav(false); setQuery(''); };
   const notify = (message) => { setNotice(message); window.setTimeout(() => setNotice(''), 2800); };
+  const saveUser = async (data) => {
+    try {
+      await apiRequest(data.id ? `/users/${data.id}` : '/users', {
+        method: data.id ? 'PATCH' : 'POST',
+        body: {
+          ...(data.name !== undefined && { name: data.name.trim() }),
+          ...(data.email !== undefined && { email: data.email.trim() }),
+          ...(data.role !== undefined && { role: data.role }),
+          ...(data.active !== undefined && { active: data.active }),
+          ...(data.password && { password: data.password }),
+        },
+      });
+      setUsers(await apiRequest('/users'));
+      setModal(null);
+      notify(data.id ? t('updateUser') : t('createUser'));
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+  const resetUserPassword = async (data) => {
+    try {
+      await apiRequest(`/users/${data.id}/password`, {
+        method: 'POST',
+        body: { password: data.password },
+      });
+      setModal(null);
+      if (data.id === user.id) {
+        await handleLogout();
+      } else {
+        notify(t('resetPassword'));
+      }
+    } catch (error) {
+      notify(error.message);
+    }
+  };
+  const submitSalePayment = async (data) => {
+    try {
+      await apiRequest(`/customers/${data.customer.id}/payments`, {
+        method: 'POST',
+        body: { amount: Number(data.amount), note: data.note || undefined },
+      });
+      await refreshWorkspace();
+      setModal(null);
+      notify(t('recordPayment'));
+    } catch (error) {
+      notify(error.message);
+    }
+  };
 
   const addMovement = async (data) => {
     const typeMap = {
@@ -599,8 +698,8 @@ export default function App() {
     return <div className="space-y-5">
       <PageHeading title={t('sales')} subtitle={`${customers.length} ${t('customers')} · ${sales.length} ${t('salesUnit')}`} action={<button onClick={() => setModal({ type: 'sale' })} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><Plus size={17} />{t('newSale')}</button>} />
       <div className="grid gap-4 sm:grid-cols-3"><MiniStat title={t('customers')} value={customers.length} icon={Users} /><MiniStat title={t('sales')} value={sales.length} icon={ShoppingBag} /><MiniStat title={t('creditBalance')} value={currency(totalCredits)} icon={CreditCard} /></div>
-      <div className="grid gap-4 xl:grid-cols-3"><div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800 xl:col-span-2"><h2 className="mb-4 font-extrabold text-slate-800 dark:text-white">آخر المبيعات</h2><div className="overflow-x-auto"><table className="w-full min-w-[580px] text-right text-xs"><thead className="bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-700/70"><tr>{[t('reference'), t('customer'), t('date'), t('total'), t('payment')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{sales.map((sale) => <tr key={sale.id}><td className="px-4 py-4 font-extrabold text-forest" dir="ltr">{sale.id}</td><td className="px-4 py-4 font-bold text-slate-700 dark:text-slate-100">{sale.customer}</td><td className="px-4 py-4 text-slate-500">{dateLabel(sale.date)}</td><td className="px-4 py-4 font-bold text-slate-700 dark:text-slate-100">{currency(sale.total)}</td><td className="px-4 py-4"><Badge tone={sale.payment === 'paid' ? 'green' : 'amber'}>{sale.payment === 'paid' ? t('paid') : t('credit')}</Badge></td></tr>)}</tbody></table></div></div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800"><h2 className="mb-4 font-extrabold text-slate-800 dark:text-white">{t('customers')}</h2><div className="max-h-[390px] space-y-3 overflow-auto">{customers.map((customer) => <div key={customer.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-100 text-forest"><UserRound size={17} /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-700 dark:text-slate-100">{customer.name}</p><p className="text-[10px] text-slate-400">{customerTypeLabel(customer.type, t)}</p></div>{customer.credit > 0 && <span className="text-[10px] font-bold text-amber-700">{currency(customer.credit)}</span>}</div>)}</div></div></div>
+      <div className="grid gap-4 xl:grid-cols-3"><div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800 xl:col-span-2"><h2 className="mb-4 font-extrabold text-slate-800 dark:text-white">آخر المبيعات</h2><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-right text-xs"><thead className="bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-700/70"><tr>{[t('reference'), t('customer'), t('date'), t('total'), t('paidAmount'), t('remaining'), t('payment')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{sales.map((sale) => <tr key={sale.id}><td className="px-4 py-4 font-extrabold text-forest" dir="ltr">{sale.id}</td><td className="px-4 py-4 font-bold text-slate-700 dark:text-slate-100">{sale.customer}</td><td className="px-4 py-4 text-slate-500">{dateLabel(sale.date)}</td><td className="px-4 py-4 font-bold text-slate-700 dark:text-slate-100">{currency(sale.total)}</td><td className="px-4 py-4 text-slate-500">{currency(sale.paidAmount)}</td><td className="px-4 py-4 font-bold text-amber-700">{currency(sale.balance)}</td><td className="px-4 py-4"><Badge tone={sale.payment === 'paid' ? 'green' : 'amber'}>{sale.payment === 'paid' ? t('paid') : t('credit')}</Badge></td></tr>)}</tbody></table></div></div>
+        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800"><h2 className="mb-4 font-extrabold text-slate-800 dark:text-white">{t('customers')}</h2><div className="max-h-[390px] space-y-3 overflow-auto">{customers.map((customer) => <div key={customer.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-100 text-forest"><UserRound size={17} /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-700 dark:text-slate-100">{customer.name}</p><p className="text-[10px] text-slate-400">{customerTypeLabel(customer.type, t)}</p>{paymentHistoryFor === customer.id && customer.payments?.length > 0 && <div className="mt-2 space-y-1 border-t border-slate-200 pt-2 dark:border-slate-600">{customer.payments.slice(0, 5).map((payment) => <div key={payment.id} className="flex justify-between gap-2 text-[10px] text-slate-500"><span>{new Date(payment.receivedAt).toLocaleDateString(language === 'fr' ? 'fr-TN' : 'ar-TN')}{payment.note ? ` · ${payment.note}` : ''}</span><b className="shrink-0 text-forest">{currency(payment.amount)}</b></div>)}</div>}</div>{customer.credit > 0 && <div className="text-end"><span className="block text-[10px] font-bold text-amber-700">{currency(customer.credit)}</span>{['ADMIN', 'SELLER'].includes(user.role) && <button onClick={() => setModal({ type: 'payment', customer })} className="mt-1 block text-[10px] font-bold text-forest">{t('collectPayment')}</button>}</div>}{customer.payments?.length > 0 && <button onClick={() => setPaymentHistoryFor((current) => current === customer.id ? null : customer.id)} className="shrink-0 text-[10px] font-bold text-slate-500">{t('paymentHistory')} ({customer.payments.length})</button>}</div>)}</div></div></div>
     </div>;
   };
 
@@ -617,25 +716,84 @@ export default function App() {
     </div>;
   };
 
-  const renderReports = () => <div className="space-y-5"><PageHeading title={t('reports')} subtitle="ملخص الأداء والمخزون · نوفمبر 2026" action={<div className="flex gap-2"><button onClick={() => notify('تم تجهيز ملف Excel التجريبي')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-white"><FileSpreadsheet size={16} className="text-green-700" />{t('exportExcel')}</button><button onClick={() => notify('تم تجهيز ملف PDF التجريبي')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-white"><Download size={15} />{t('exportPdf')}</button></div>} />
-      <div className="grid gap-4 sm:grid-cols-2">{[
-        [t('inventoryReport'), 'تفاصيل الكميات والقيمة الحالية لكل صنف', Package, currency(stockValue)],
-        [t('lossReport'), 'الفاقد حسب المرض والصقيع والجفاف والتلف', AlertTriangle, `${monthlyLoss} شتلة`],
-        [t('bestSellers'), 'ذروة الربيع والخريف · آخر 12 شهراً', Activity, `${sales.length} ${t('salesUnit')}`],
-        [t('customerSales'), 'الأفراد والبستانيون والبلديات', Users, currency(sales.reduce((sum, sale) => sum + sale.total, 0))],
-      ].map(([title, subtitle, Icon, amount], index) => <div key={title} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800"><div className="flex items-center justify-between"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-forest"><Icon size={19} /></span><button onClick={() => notify(`تم فتح تقرير: ${title}`)} className="text-xs font-bold text-forest">{t('seeAll')} <ChevronLeft size={13} className="inline" /></button></div><h2 className="mt-4 font-extrabold text-slate-800 dark:text-white">{title}</h2><p className="mt-1 text-xs text-slate-400">{subtitle}</p><p className="mt-4 text-xl font-extrabold text-forest">{amount}</p>{index === 0 && <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full w-[72%] rounded-full bg-gradient-to-l from-green-600 to-lime-400" /></div>}</div>)}</div>
-      <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800"><div className="mb-4 flex justify-between"><h2 className="font-extrabold text-slate-800 dark:text-white">ملخص تقييم المخزون</h2><span className="text-xs text-slate-400">{products.length} صنف</span></div><div className="overflow-x-auto"><table className="w-full min-w-[550px] text-right text-xs"><thead className="bg-slate-50 text-slate-500 dark:bg-slate-700/70"><tr>{[t('category'), t('products'), t('quantity'), t('stockValue')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{categories.map((category) => { const items = products.filter((p) => p.category === category); if (!items.length) return null; return <tr key={category}><td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-100">{category}</td><td className="px-4 py-3 text-slate-500">{items.length}</td><td className="px-4 py-3 text-slate-500">{items.reduce((sum, p) => sum + getQty(p.id), 0)}</td><td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-100">{currency(items.reduce((sum, p) => sum + getQty(p.id) * p.purchasePrice, 0))}</td></tr>; })}</tbody></table></div></div>
+  const renderReports = () => {
+    const report = reportData;
+    const downloadExcelCsv = () => {
+      if (!report) return;
+      const csvRows = [
+        ['Report', 'Date', 'SKU', 'Product', 'Category', 'Customer', 'Quantity', 'Minimum stock', 'Amount (TND)', 'Details'],
+        ...report.inventory.map((item) => ['Inventory', '', item.sku, item.nameAr, item.categoryAr, '', item.quantity, item.minimum, item.stockValue, `${item.size} · ${item.location}`]),
+        ...report.salesByDay.map((item) => ['Daily sales', item.date, '', '', '', '', item.count, '', item.total, 'Sale count']),
+        ...report.salesByCustomer.map((item) => ['Sales by customer', '', '', '', '', item.customer, item.count, '', item.total, 'Sale count']),
+        ...report.salesByProduct.map((item) => ['Sales by product', '', item.sku, item.productAr, '', '', item.quantity, '', item.total, '']),
+        ...report.losses.map((item) => ['Loss', item.date, item.sku, item.productAr, '', '', item.quantity, '', '', item.reason]),
+      ];
+      downloadCsv(`inventory-${report.from}-${report.to}.csv`, csvRows);
+    };
+    const printPdf = () => {
+      if (!report) return;
+      const popup = window.open('', '_blank');
+      if (!popup) {
+        notify(isRtl ? 'اسمح بالنوافذ المنبثقة لطباعة التقرير' : 'Autorisez les fenêtres pop-up pour imprimer le rapport');
+        return;
+      }
+      popup.document.write(buildReportPrintHtml(report, isRtl));
+      popup.document.close();
+      popup.focus();
+      window.setTimeout(() => popup.print(), 250);
+    };
+    return <div className="space-y-5">
+      <PageHeading title={t('reports')} subtitle={`${report?.from || reportFrom} – ${report?.to || reportTo}`} action={<div className="flex flex-wrap gap-2">
+        <button disabled={!report} onClick={downloadExcelCsv} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"><FileSpreadsheet size={16} className="text-green-700" />{t('exportCsv')}</button>
+        <button disabled={!report} onClick={printPdf} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"><Download size={15} />{t('exportPdf')}</button>
+      </div>} />
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800">
+        <Field label={t('reportFrom')}><input type="date" value={reportFrom} max={reportTo} onChange={(event) => setReportFrom(event.target.value)} className={inputClass} /></Field>
+        <Field label={t('reportTo')}><input type="date" value={reportTo} min={reportFrom} onChange={(event) => setReportTo(event.target.value)} className={inputClass} /></Field>
+      </div>
+      {reportError && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{t('reportError')}: {reportError}</p>}
+      {!report && !reportError && <p role="status" className="rounded-xl bg-green-50 px-4 py-3 text-sm font-bold text-forest">{t('reportLoading')}</p>}
+      {report && <>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MiniStat title={t('reportSales')} value={currency(report.summary.salesTotal)} icon={Activity} />
+          <MiniStat title={t('reportCount')} value={report.summary.salesCount} icon={ShoppingBag} />
+          <MiniStat title={t('reportStock')} value={currency(report.summary.inventoryValue)} icon={Package} />
+          <MiniStat title={t('reportCredit')} value={currency(report.summary.creditOutstanding)} icon={CreditCard} />
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <ReportTable title={t('reportInventory')} headers={[t('product'), t('category'), t('quantity'), t('minimum'), t('stockValue')]} rows={report.inventory.map((item) => [isRtl ? item.nameAr : item.nameFr, categoryLabel(isRtl ? item.categoryAr : item.categoryFr), item.quantity, item.minimum, currency(item.stockValue)])} t={t} />
+          <ReportTable title={t('customerSales')} headers={[t('customer'), t('reportCount'), t('total')]} rows={report.salesByCustomer.map((item) => [item.customer, item.count, currency(item.total)])} t={t} />
+          <ReportTable title={t('bestSellers')} headers={[t('date'), t('reportCount'), t('total')]} rows={report.salesByDay.map((item) => [item.date, item.count, currency(item.total)])} t={t} />
+          <ReportTable title={t('lossReport')} headers={[t('reason'), t('quantity'), t('reportCount')]} rows={report.lossesByReason.map((item) => [item.reason, item.quantity, item.entries])} t={t} />
+          <ReportTable title={isRtl ? 'الأكثر مبيعاً حسب المنتج' : 'Ventes par produit'} headers={[t('product'), t('quantity'), t('total')]} rows={report.salesByProduct.map((item) => [isRtl ? item.productAr : item.productFr, item.quantity, currency(item.total)])} t={t} />
+        </div>
+      </>}
     </div>;
+  };
   const renderUsers = () => {
-    const permissions = [
-      ['عرض لوحة التحكم', true, true, true, true], ['إدارة المنتجات', true, true, false, false],
-      ['حركات المخزون', true, true, false, false], ['تسجيل المبيعات', true, false, true, false],
-      ['إدارة المشتريات', true, true, false, false], ['التقارير المالية', true, false, false, false],
-      ['إدارة المستخدمين', true, false, false, false],
-    ];
-    return <div className="space-y-5"><PageHeading title={t('users')} subtitle="إدارة الأدوار وصلاحيات فريق العمل" action={<button onClick={() => notify('إضافة المستخدمين متاحة في النسخة الكاملة')} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><Plus size={17} />إضافة مستخدم</button>} />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[['A', t('admin'), 'كامل الصلاحيات', 'bg-green-100 text-forest'], ['م', t('storekeeper'), 'المخزون والمشتريات', 'bg-amber-100 text-amber-800'], ['ب', t('seller'), 'المبيعات والعملاء', 'bg-sky-100 text-sky-800'], ['ش', t('viewer'), 'عرض البيانات فقط', 'bg-slate-100 text-slate-700']].map(([initial, name, desc, classes]) => <div key={name} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800"><div className="flex items-center gap-3"><div className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-extrabold ${classes}`}>{initial}</div><div><p className="font-extrabold text-slate-800 dark:text-white">{name}</p><p className="text-[11px] text-slate-400">{desc}</p></div></div><div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-[11px] text-slate-500 dark:border-slate-700"><span>مستخدم نشط</span><Badge>نشط</Badge></div></div>)}</div>
-      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800"><div className="p-5"><h2 className="font-extrabold text-slate-800 dark:text-white">مصفوفة الصلاحيات</h2><p className="mt-1 text-xs text-slate-400">إدارة الوصول إلى أقسام النظام حسب الدور</p></div><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-center text-xs"><thead className="bg-slate-50 text-slate-500 dark:bg-slate-700/70"><tr><th className="px-4 py-3 text-right">{t('permission')}</th>{[t('admin'), t('storekeeper'), t('seller'), t('viewer')].map((role) => <th key={role} className="px-4 py-3">{role}</th>)}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-700">{permissions.map(([label, ...allowed]) => <tr key={label}><td className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-100">{label}</td>{allowed.map((yes, index) => <td key={index} className="px-4 py-3">{yes ? <Check size={17} className="mx-auto text-forest" /> : <X size={15} className="mx-auto text-slate-300" />}</td>)}</tr>)}</tbody></table></div></div>
+    if (user.role !== 'ADMIN') return <PageHeading title={t('users')} subtitle={t('permission')} />;
+    const roleLabel = { ADMIN: t('admin'), STOREKEEPER: t('storekeeper'), SELLER: t('seller'), VIEWER: t('viewer') };
+    return <div className="space-y-5">
+      <PageHeading title={t('users')} subtitle={t('userActions')} action={<button onClick={() => setModal({ type: 'userEdit' })} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><Plus size={17} />{t('createUser')}</button>} />
+      {usersError && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{usersError}</p>}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Object.entries(roleLabel).map(([role, label]) => <MiniStat key={role} title={label} value={users.filter((item) => item.role === role && item.active).length} icon={Users} />)}</div>
+      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800">
+        <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-right text-xs">
+          <thead className="bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-700/70"><tr>{[t('userName'), t('userEmail'), t('role'), t('status'), t('createdAt'), t('userActions')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">{users.map((item) => <tr key={item.id}>
+            <td className="px-4 py-4 font-bold text-slate-700 dark:text-slate-100">{item.name}</td>
+            <td className="px-4 py-4 text-slate-500" dir="ltr">{item.email}</td>
+            <td className="px-4 py-4">{roleLabel[item.role]}</td>
+            <td className="px-4 py-4"><Badge tone={item.active ? 'green' : 'gray'}>{item.active ? t('activeUser') : t('inactiveUser')}</Badge></td>
+            <td className="px-4 py-4 text-slate-500">{new Date(item.createdAt).toLocaleDateString(language === 'fr' ? 'fr-TN' : 'ar-TN')}</td>
+            <td className="px-4 py-4"><div className="flex gap-1">
+              <button onClick={() => setModal({ type: 'userEdit', item })} className="rounded-lg bg-slate-100 px-3 py-2 font-bold text-slate-700 dark:bg-slate-700 dark:text-white">{t('edit')}</button>
+              <button onClick={() => setModal({ type: 'userPassword', item })} className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-3 py-2 font-bold text-amber-800"><KeyRound size={13} />{t('resetPassword')}</button>
+            </div></td>
+          </tr>)}</tbody>
+        </table>{!users.length && !usersError && <Empty text={t('noResults')} />}</div>
+      </div>
+      <p className="text-xs text-slate-400">{t('passwordResetHint')}</p>
     </div>;
   };
 
@@ -656,7 +814,7 @@ export default function App() {
         <div className="mb-7 flex items-center gap-3 px-2"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-forest text-white shadow-md shadow-green-900/15"><Leaf size={24} /></div><div><h1 className="text-[17px] font-extrabold leading-tight text-slate-800 dark:text-white">مشتل الزاهي</h1><p className="mt-0.5 text-[10px] font-semibold tracking-wide text-slate-400">MASHTAL EZZAHI · TUNISIE</p></div><button onClick={() => setMobileNav(false)} className="ms-auto text-slate-400 lg:hidden"><X size={19} /></button></div>
         <div className="mb-5 flex items-center gap-3 rounded-2xl bg-[#f5f8f4] p-3 dark:bg-slate-800"><div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-green-600 to-lime-400 text-sm font-extrabold text-white">{user.name?.slice(0, 1) || 'ز'}<span className="absolute bottom-0 end-0 h-3 w-3 rounded-full border-2 border-white bg-green-400" /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-extrabold text-slate-700 dark:text-white">{user.name}</p><p className="text-[10px] text-slate-400">{translations.ar[({ ADMIN: 'admin', STOREKEEPER: 'storekeeper', SELLER: 'seller', VIEWER: 'viewer' })[user.role]] || t('viewer')}</p></div><ChevronDown size={14} className="text-slate-400" /></div>
         <nav className="flex-1 space-y-5 overflow-y-auto">
-          {navGroups.map((group) => <div key={group.title}><p className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[.13em] text-slate-400">{t(group.title)}</p><div className="space-y-1">{group.items.map(([page, Icon]) => {
+          {navGroups.map((group) => <div key={group.title}><p className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[.13em] text-slate-400">{t(group.title)}</p><div className="space-y-1">{group.items.filter(([page]) => page !== 'users' || user.role === 'ADMIN').map(([page, Icon]) => {
             const count = page === 'alerts' ? lowProducts.length : 0;
             return <button key={page} onClick={() => navigate(page)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-bold transition ${activePage === page ? 'bg-green-50 text-forest dark:bg-green-900/30 dark:text-green-300' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800'}`}><Icon size={17} strokeWidth={activePage === page ? 2.4 : 1.8} /><span className="flex-1 text-start">{t(page)}</span>{count > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-100 px-1 text-[10px] font-extrabold text-rose-600">{count}</span>}{activePage === page && <span className="h-1.5 w-1.5 rounded-full bg-forest" />}</button>;
           })}</div></div>)}
@@ -683,8 +841,72 @@ export default function App() {
     {modal?.type === 'sale' && <SaleForm products={products} customers={customers} getQty={getQty} t={t} onClose={() => setModal(null)} onSave={submitSale} />}
     {modal?.type === 'batch' && <BatchForm products={products} t={t} onClose={() => setModal(null)} onSave={createBatch} />}
     {modal?.type === 'order' && <OrderForm suppliers={suppliers} products={products} t={t} onClose={() => setModal(null)} onSave={createPurchaseOrder} />}
+    {modal?.type === 'payment' && <SalePaymentForm customer={modal.customer} t={t} onClose={() => setModal(null)} onSave={submitSalePayment} />}
+    {modal?.type === 'userEdit' && <UserForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={saveUser} />}
+    {modal?.type === 'userPassword' && <UserPasswordForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={resetUserPassword} />}
     {notice && <div role="status" className="fixed bottom-5 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white shadow-xl"><Check size={16} className="text-green-300" />{notice}</div>}
   </div>;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map((value) => {
+    let text = String(value ?? '');
+    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    return `"${text.replaceAll('"', '""')}"`;
+  }).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character]);
+}
+
+function buildReportPrintHtml(report, isRtl) {
+  const table = (title, headings, rows) => `<section><h2>${escapeHtml(title)}</h2><table><thead><tr>${headings.map((item) => `<th>${escapeHtml(item)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((item) => `<td>${escapeHtml(item)}</td>`).join('')}</tr>`).join('')}</tbody></table></section>`;
+  const inventory = report.inventory.map((item) => [
+    isRtl ? item.nameAr : item.nameFr,
+    item.sku,
+    item.quantity,
+    item.minimum,
+    `${Number(item.stockValue).toFixed(3)} TND`,
+  ]);
+  const customers = report.salesByCustomer.map((item) => [item.customer, item.count, `${Number(item.total).toFixed(3)} TND`]);
+  const daily = report.salesByDay.map((item) => [item.date, item.count, `${Number(item.total).toFixed(3)} TND`]);
+  const losses = report.lossesByReason.map((item) => [item.reason, item.quantity, item.entries]);
+  return `<!doctype html><html lang="${isRtl ? 'ar' : 'fr'}" dir="${isRtl ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>Mashtal Ezzahi - Report</title><style>
+    body{font-family:Arial,sans-serif;color:#193b28;margin:32px}h1{margin-bottom:4px}p{color:#66736a}.summary{display:flex;gap:24px;flex-wrap:wrap;margin:24px 0}.summary strong{display:block;color:#176b2e;font-size:20px;margin-top:5px}section{margin:28px 0;break-inside:avoid}h2{font-size:16px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{text-align:start;border:1px solid #dfe6df;padding:7px}th{background:#edf5ed}@media print{body{margin:14mm}section{break-inside:auto}tr{break-inside:avoid}}
+  </style></head><body><h1>${isRtl ? 'مشتل الزاهي · التقارير' : 'Mashtal Ezzahi · Rapports'}</h1><p>${escapeHtml(report.from)} – ${escapeHtml(report.to)}</p><div class="summary">
+    <div>${isRtl ? 'المبيعات' : 'Ventes'}<strong>${Number(report.summary.salesTotal).toFixed(3)} TND</strong></div>
+    <div>${isRtl ? 'عدد المبيعات' : 'Nombre de ventes'}<strong>${report.summary.salesCount}</strong></div>
+    <div>${isRtl ? 'قيمة المخزون' : 'Valeur du stock'}<strong>${Number(report.summary.inventoryValue).toFixed(3)} TND</strong></div>
+    <div>${isRtl ? 'الرصيد الآجل' : 'Crédit restant'}<strong>${Number(report.summary.creditOutstanding).toFixed(3)} TND</strong></div>
+    <div>${isRtl ? 'وحدات الفاقد' : 'Pertes (unités)'}<strong>${report.summary.lossUnits}</strong></div>
+  </div>
+  ${table(isRtl ? 'المخزون الحالي' : 'Stock actuel', [isRtl ? 'المنتج' : 'Produit', 'SKU', isRtl ? 'الكمية' : 'Quantité', isRtl ? 'الحد الأدنى' : 'Minimum', isRtl ? 'قيمة المخزون' : 'Valeur'], inventory)}
+  ${table(isRtl ? 'المبيعات حسب العميل' : 'Ventes par client', [isRtl ? 'العميل' : 'Client', isRtl ? 'عدد المبيعات' : 'Ventes', isRtl ? 'الإجمالي' : 'Total'], customers)}
+  ${table(isRtl ? 'المبيعات اليومية' : 'Ventes quotidiennes', [isRtl ? 'التاريخ' : 'Date', isRtl ? 'عدد المبيعات' : 'Ventes', isRtl ? 'الإجمالي' : 'Total'], daily)}
+  ${table(isRtl ? 'الخسائر حسب السبب' : 'Pertes par motif', [isRtl ? 'السبب' : 'Motif', isRtl ? 'الكمية' : 'Quantité', isRtl ? 'العمليات' : 'Opérations'], losses)}
+  </body></html>`;
+}
+
+function ReportTable({ title, headers, rows, t }) {
+  return <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800">
+    <h2 className="px-5 pt-5 font-extrabold text-slate-800 dark:text-white">{title}</h2>
+    <div className="overflow-x-auto"><table className="mt-3 w-full min-w-[420px] text-right text-xs">
+      <thead className="bg-slate-50 text-slate-500 dark:bg-slate-700/70"><tr>{headers.map((header) => <th key={header} className="px-4 py-3">{header}</th>)}</tr></thead>
+      <tbody className="divide-y divide-slate-100 dark:divide-slate-700">{rows.map((row, index) => <tr key={index}>{row.map((value, cell) => <td key={cell} className="px-4 py-3 text-slate-600 dark:text-slate-200">{value}</td>)}</tr>)}</tbody>
+    </table>{!rows.length && <Empty text={t('noResults')} />}</div>
+  </section>;
 }
 
 function PageHeading({ title, subtitle, action }) {
@@ -747,6 +969,56 @@ function MovementForm({ products, productById, getQty, seedType, t, onClose, onS
     </> : <Field label={t('location')}><select value={form.location || product?.location || ''} onChange={update('location')} className={selectClass}>{['مشتل 1', 'مشتل 2', 'بيت الظل', 'الساحة A', 'الساحة B', 'المخزن'].map((location) => <option key={location}>{location}</option>)}</select></Field>}
     <Field label={t('reference')}><input value={form.reference} onChange={update('reference')} className={inputClass} /></Field>
   </div><FormActions onClose={onClose} t={t} /></form></Modal>;
+}
+
+function SalePaymentForm({ customer, t, onClose, onSave }) {
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  return <Modal title={`${t('collectPayment')} · ${customer.name}`} onClose={onClose}>
+    <div className="mb-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
+      <p className="font-bold">{customer.name}</p>
+      <p className="mt-1">{t('remaining')}: {currency(customer.credit)}</p>
+    </div>
+    <form onSubmit={(event) => { event.preventDefault(); onSave({ customer, amount, note }); }}>
+      <div className="grid gap-4">
+        <Field label={t('paymentAmount')}><input required type="number" min="0.001" max={customer.credit} step="0.001" value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} /></Field>
+        <Field label={t('paymentNote')}><input maxLength="200" value={note} onChange={(event) => setNote(event.target.value)} className={inputClass} /></Field>
+      </div>
+      <FormActions onClose={onClose} t={t} submitLabel={t('recordPayment')} />
+    </form>
+  </Modal>;
+}
+
+function UserForm({ item, t, onClose, onSave }) {
+  const [form, setForm] = useState(item
+    ? { id: item.id, name: item.name, email: item.email, role: item.role, active: item.active }
+    : { name: '', email: '', role: 'VIEWER', password: '' });
+  const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  return <Modal title={item ? t('updateUser') : t('createUser')} onClose={onClose}>
+    <form onSubmit={(event) => { event.preventDefault(); onSave(form); }}>
+      <div className="grid gap-4">
+        <Field label={t('userName')}><input required maxLength="120" value={form.name} onChange={update('name')} className={inputClass} /></Field>
+        <Field label={t('userEmail')}><input required type="email" autoComplete="email" value={form.email} onChange={update('email')} className={inputClass} dir="ltr" /></Field>
+        <Field label={t('role')}><select value={form.role} onChange={update('role')} className={selectClass}>
+          <option value="ADMIN">{t('admin')}</option><option value="STOREKEEPER">{t('storekeeper')}</option><option value="SELLER">{t('seller')}</option><option value="VIEWER">{t('viewer')}</option>
+        </select></Field>
+        {item
+          ? <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300"><input type="checkbox" checked={form.active} onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))} />{t('activeUser')}</label>
+          : <Field label={t('initialPassword')}><input required type="password" autoComplete="new-password" minLength="12" value={form.password} onChange={update('password')} className={inputClass} dir="ltr" /></Field>}
+      </div>
+      <FormActions onClose={onClose} t={t} submitLabel={item ? t('updateUser') : t('createUser')} />
+    </form>
+  </Modal>;
+}
+
+function UserPasswordForm({ item, t, onClose, onSave }) {
+  const [password, setPassword] = useState('');
+  return <Modal title={`${t('resetPasswordFor')} · ${item.name}`} onClose={onClose}>
+    <form onSubmit={(event) => { event.preventDefault(); onSave({ id: item.id, password }); }}>
+      <Field label={t('initialPassword')}><input required type="password" autoComplete="new-password" minLength="12" value={password} onChange={(event) => setPassword(event.target.value)} className={inputClass} dir="ltr" /></Field>
+      <FormActions onClose={onClose} t={t} submitLabel={t('resetPassword')} />
+    </form>
+  </Modal>;
 }
 
 function SaleForm({ products, customers, getQty, t, onClose, onSave }) {

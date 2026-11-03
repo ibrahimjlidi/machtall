@@ -10,6 +10,8 @@ import { ProductionModule } from './production/production.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
 import { SalesModule } from './sales/sales.module';
 import { ReferenceModule } from './reference/reference.module';
+import { UsersModule } from './users/users.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -17,8 +19,18 @@ import { ReferenceModule } from './reference/reference.module';
       isGlobal: true,
       validate: (config) => {
         if (!config.DATABASE_URL) throw new Error('DATABASE_URL must be configured');
-        if (!config.JWT_ACCESS_SECRET || config.JWT_ACCESS_SECRET.length < 32) {
-          throw new Error('JWT_ACCESS_SECRET must contain at least 32 characters');
+        if (!config.JWT_ACCESS_SECRET || config.JWT_ACCESS_SECRET.length < 32
+          || /replace[-_ ]?with|change[-_ ]?me|placeholder|example/i.test(config.JWT_ACCESS_SECRET)) {
+          throw new Error('JWT_ACCESS_SECRET must be unique, not a placeholder, and contain at least 32 characters');
+        }
+        try {
+          const databasePassword = decodeURIComponent(new URL(config.DATABASE_URL).password);
+          if (!databasePassword || /replace[-_ ]?with|change[-_ ]?me|placeholder|example/i.test(databasePassword)) {
+            throw new Error('DATABASE_URL must use a unique database password, not a placeholder');
+          }
+        } catch (error) {
+          if (error instanceof Error && error.message.startsWith('DATABASE_URL')) throw error;
+          throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL');
         }
         return config;
       },
@@ -33,6 +45,8 @@ import { ReferenceModule } from './reference/reference.module';
     PurchasingModule,
     SalesModule,
     ReferenceModule,
+    UsersModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
