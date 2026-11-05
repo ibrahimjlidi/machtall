@@ -849,10 +849,7 @@ export class SalesService {
 
   async customerBalances(user: AuthUser) {
     const customers = await this.prisma.customer.findMany({
-      where: {
-        active: true,
-        ...(user.role === UserRole.SELLER && { sales: { some: { createdById: user.sub } } }),
-      },
+      where: { active: true },
       include: {
         payments: {
           where: user.role === UserRole.SELLER

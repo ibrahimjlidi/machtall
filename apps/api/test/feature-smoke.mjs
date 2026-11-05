@@ -754,6 +754,12 @@ async function run() {
   });
   const { payload: sellerProducts } = await request('/products', { cookie: sellerCookie });
   assert.ok(sellerProducts.length && sellerProducts.every((item) => !('purchasePrice' in item)));
+  const { payload: sellerCustomersBeforeSale } = await request('/customers', { cookie: sellerCookie });
+  assert.equal(sellerCustomersBeforeSale.length, initialCustomers.length);
+  const unrelatedSellerCustomer = sellerCustomersBeforeSale.find((item) => item.id === openingCreditCustomer.id);
+  assert.equal(unrelatedSellerCustomer.credit, 0);
+  assert.equal(unrelatedSellerCustomer.openingCredit, 0);
+  assert.deepEqual(unrelatedSellerCustomer.payments, []);
   await request('/products', {
     method: 'POST',
     cookie: sellerCookie,
