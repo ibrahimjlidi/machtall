@@ -27,10 +27,11 @@ flowchart LR
 | [`apps/api/src/app.module.ts`](../apps/api/src/app.module.ts) | Composition root that registers the domain modules |
 | [`apps/api/src/auth/`](../apps/api/src/auth/) | Login/session authentication, JWT guard, roles decorator, and authorization guard |
 | [`apps/api/src/products/`](../apps/api/src/products/) | Product catalog, opening balances, edits, and archive rules |
-| [`apps/api/src/movements/`](../apps/api/src/movements/) | Inventory ledger movements, outbound validation, and transfers |
-| [`apps/api/src/purchasing/`](../apps/api/src/purchasing/) | Suppliers' purchase orders and receiving |
-| [`apps/api/src/production/`](../apps/api/src/production/) | Production batches and ready-to-stock conversion |
+| [`apps/api/src/movements/`](../apps/api/src/movements/) | Append-only inventory ledger, outbound validation, transfers, physical counts, and approved adjustments |
+| [`apps/api/src/purchasing/`](../apps/api/src/purchasing/) | Supplier records, quote comparison and price snapshots, purchase orders, amount-bearing new invoices/returns, partial receipts, and linked damaged-goods movements |
+| [`apps/api/src/production/`](../apps/api/src/production/) | Batch growth stages, assigned nursery tasks, care and loss history, and verified ready-to-stock conversion |
 | [`apps/api/src/sales/`](../apps/api/src/sales/) | Sales, customer lookup/balances, and transactional stock-out |
+| [`apps/api/src/accounting/`](../apps/api/src/accounting/) | Expense approval/payment, supplier payments, cash reconciliation, VAT-rate setup, and operational financial reports |
 | [`apps/api/src/dashboard/`](../apps/api/src/dashboard/) | Server-side summary metrics for the dashboard |
 | [`apps/api/src/common/stock.ts`](../apps/api/src/common/stock.ts) | Shared ledger-to-stock and per-location balance calculations |
 | [`apps/api/src/prisma/`](../apps/api/src/prisma/) | Database connection service shared by modules |
@@ -47,7 +48,7 @@ Each workflow test includes a node-and-connector Mermaid flowchart and **Project
 3. **Data** — relevant PostgreSQL models and shared stock calculations.
 4. **Result** — the returned quantity/status, rejection path, or UI-only behavior.
 
-Inventory quantity is derived from `InventoryMovement` records. A successful business operation creates the related movement in the same transaction where indicated; the UI then reloads the relevant workspace data.
+Inventory quantity is derived from `InventoryMovement` records. Physical counts are immutable snapshots of the ledger balance and counted quantity; they do not directly update inventory. A discrepancy creates a manager-reviewed request, and the approval is rejected if stock changed since the count. Purchase receipts record actual quantities transactionally, with damaged units written as linked losses. The UI then reloads the relevant workspace data.
 
 The flowcharts use color-coded nodes to distinguish frontend, backend, persistence, and result. Their left-to-right layout is intended to make the architecture and branch/validation paths legible in Markdown previews that support Mermaid.
 

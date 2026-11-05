@@ -12,21 +12,23 @@ export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
   @Get()
-  list() { return this.products.list(); }
+  list(@Req() request: AuthenticatedRequest) { return this.products.list(request.user.role); }
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.STOREKEEPER)
+  @Roles(UserRole.ADMIN)
   create(@Body() input: CreateProductDto, @Req() request: AuthenticatedRequest) {
     return this.products.create(input, request.user);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.STOREKEEPER)
-  update(@Param('id') id: string, @Body() input: UpdateProductDto) {
-    return this.products.update(id, input);
+  @Roles(UserRole.ADMIN)
+  update(@Param('id') id: string, @Body() input: UpdateProductDto, @Req() request: AuthenticatedRequest) {
+    return this.products.update(id, input, request.user);
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
-  archive(@Param('id') id: string) { return this.products.archive(id); }
+  archive(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.products.archive(id, request.user);
+  }
 }

@@ -11,4 +11,4 @@ This folder contains operational workflow documentation and test evidence for th
 
 ## Documentation status
 
-The workflow results are a dated manual smoke-test record against the running demo, not a permanent automated test suite. Re-run them after material changes to inventory, purchasing, production, sales, or authorization behavior.
+The stock workflow results are a dated manual smoke-test record against the running demo, not a permanent automated test suite. The automated test suites additionally cover the Phase 7 accounting workflows described in [workflow testing](testing/README.md). Re-run relevant checks after material changes to inventory, purchasing, production, sales, accounting, or authorization behavior.

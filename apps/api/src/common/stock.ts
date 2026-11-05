@@ -5,11 +5,13 @@ type MovementReader = Prisma.TransactionClient | PrismaClient;
 const incoming = new Set<MovementType>([
   MovementType.PURCHASE_IN,
   MovementType.PRODUCTION_IN,
+  MovementType.SALE_RETURN_IN,
   MovementType.ADJUSTMENT_IN,
 ]);
 const outgoing = new Set<MovementType>([
   MovementType.SALE_OUT,
   MovementType.LOSS_OUT,
+  MovementType.INTERNAL_ISSUE_OUT,
   MovementType.ADJUSTMENT_OUT,
 ]);
 

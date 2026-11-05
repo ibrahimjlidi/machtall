@@ -39,6 +39,32 @@ async function seed() {
     update: { name: 'سيد الزاهي', passwordHash, role: UserRole.ADMIN, active: true },
   });
 
+  const viewerEmail = process.env.SEED_VIEWER_EMAIL?.toLowerCase();
+  const viewerPassword = process.env.SEED_VIEWER_PASSWORD;
+  if ((viewerEmail && !viewerPassword) || (!viewerEmail && viewerPassword)) {
+    throw new Error('SEED_VIEWER_EMAIL and SEED_VIEWER_PASSWORD must be provided together');
+  }
+  if (viewerEmail && viewerPassword) {
+    if (viewerPassword.length < 12 || /replace[-_ ]?with|change[-_ ]?me|placeholder|example/i.test(viewerPassword)) {
+      throw new Error('SEED_VIEWER_PASSWORD must be unique and at least 12 characters');
+    }
+    await prisma.user.upsert({
+      where: { email: viewerEmail },
+      create: {
+        name: 'Legacy Viewer Test Fixture',
+        email: viewerEmail,
+        passwordHash: await hash(viewerPassword, 12),
+        role: UserRole.VIEWER,
+      },
+      update: {
+        name: 'Legacy Viewer Test Fixture',
+        passwordHash: await hash(viewerPassword, 12),
+        role: UserRole.VIEWER,
+        active: true,
+      },
+    });
+  }
+
   const categories = [...new Set(initialProducts.map((product) => product.category))];
   await prisma.category.createMany({
     data: categories.map((nameAr) => ({

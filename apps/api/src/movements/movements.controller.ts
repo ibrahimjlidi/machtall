@@ -12,6 +12,7 @@ export class MovementsController {
   constructor(private readonly movements: MovementsService) {}
 
   @Get()
+  @Roles(UserRole.ADMIN, UserRole.STOREKEEPER, UserRole.ACCOUNTANT, UserRole.VIEWER)
   list(@Query('type') type?: MovementType) {
     return this.movements.list(type);
   }

@@ -13,6 +13,10 @@ Start with [project structure and architecture](../architecture.md) for the UI â
 
 The scenarios include product setup, incoming and outgoing ledger movements, purchase receipt, production readiness, sales, losses, adjustments, location transfers, stock guards, low-stock alerts, archiving, and inventory reports.
 
+The [nursery production workflow](production-workflows/01-nursery-production.md) records Phase 6 task assignment, care logs, loss reporting, growth stages, worker scoping, and ready-stock approval coverage.
+
+The automated API end-to-end suite also covers Phase 7 accounting on an isolated disposable database: expense approval and settlement, reviewed supplier-invoice payments, cash/non-cash payment treatment, cash-session review and variance approval, inactive VAT-rate configuration, and operational report totals. The Playwright suite stubs accounting API responses while checking the Accountant and GÃ©rant screens and permissions. These accounting reports are operational, not statutory; VAT application and profit reporting remain disabled.
+
 ## Scope and interpretation
 
 Results were checked against persisted API responses and, for selected flows, the running Arabic browser UI. This is manual integration/smoke-test evidence; it does not replace automated unit or integration tests. Demo-only features (including spreadsheet/PDF exports and some seasonal report content) are identified in the relevant scenario.

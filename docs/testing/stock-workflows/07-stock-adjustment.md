@@ -1,40 +1,42 @@
-# 07 — Correct a stock count with adjustments
+# 07 — Count stock and request an approved adjustment
 
-**Result: PASS** · Executed 2026-11-02  
-**Verification:** Authenticated API integration check against PostgreSQL
+**Scenario status:** Phase 4 API regression coverage added; execute only against a disposable migrated database.
 
 ## Purpose
 
-Verify positive and negative inventory corrections are kept as separate ledger entries and net correctly.
+Verify that stockkeepers record a physical count, the server captures the ledger balance for the location, and only a manager-approved discrepancy changes stock.
 
 ## Project flow
 
 ```mermaid
 flowchart LR
     subgraph FRONTEND["Frontend · React"]
-        USER([Admin / Storekeeper]) --> FORM["Adjustment form<br/>src/App.jsx"]
+        USER([Storekeeper]) --> FORM["Physical count form<br/>src/App.jsx"]
         FORM --> CLIENT["API client<br/>src/api.js"]
-        CLIENT --> IN["Increase +3"]
-        CLIENT --> OUT["Decrease −2"]
+        CLIENT --> COUNT["POST /stock-counts"]
+        COUNT --> COMPARE["Compare actual count<br/>with ledger quantity"]
+        COMPARE --> IN["Create pending adjustment"]
     end
     subgraph BACKEND["Backend · NestJS"]
-        GUARD["JWT + role guards"] --> CTRL["MovementsController"]
-        CTRL --> SERVICE["MovementsService"]
-        SERVICE --> VALIDATE["Check available stock<br/>for outbound only"]
+        GUARD["JWT + role guards"] --> CTRL["StockCountsController"]
+        CTRL --> SERVICE["AdjustmentsService"]
+        SERVICE --> VALIDATE["Record immutable count<br/>and create request if different"]
+        REVIEW["Admin approval"] --> STALE["Reject approval if stock<br/>changed since the count"]
     end
     subgraph DATA["Database · PostgreSQL"]
-        INROW[(ADJUSTMENT_IN)]
-        OUTROW[(ADJUSTMENT_OUT)]
+        COUNTROW[(StockCount<br/>system + counted quantities)]
+        REQUEST[(AdjustmentRequest)]
+        INROW[(Approved adjustment movement)]
         STOCK["stock.ts<br/>sum signed movements"]
     end
-    IN -->|"POST /api/movements"| GUARD
-    OUT -->|"POST /api/movements"| GUARD
-    SERVICE --> INROW
-    SERVICE --> VALIDATE
-    VALIDATE --> OUTROW
+    COUNT --> GUARD
+    SERVICE --> COUNTROW
+    SERVICE -->|"difference only"| REQUEST
+    REQUEST --> REVIEW
+    REVIEW --> STALE
+    STALE -->|"unchanged"| INROW
     INROW --> STOCK
-    OUTROW --> STOCK
-    STOCK --> RESULT["Net +1<br/>On hand: 21 → 22"]
+    STOCK --> RESULT["Exact count: no movement<br/>Difference: approved ledger entry"]
     RESULT -.-> FORM
     classDef actor fill:#eef7ef,stroke:#2e7d32,color:#18351b
     classDef ui fill:#e8f5e9,stroke:#2e7d32,color:#18351b
@@ -42,9 +44,9 @@ flowchart LR
     classDef data fill:#fff7e6,stroke:#f9a825,color:#493500
     classDef result fill:#f4efe9,stroke:#8d6e63,color:#3d302b
     class USER actor
-    class FORM,CLIENT,IN,OUT ui
-    class GUARD,CTRL,SERVICE,VALIDATE api
-    class INROW,OUTROW,STOCK data
+    class FORM,CLIENT,COUNT,REVIEW ui
+    class GUARD,CTRL,SERVICE,VALIDATE,STALE api
+    class COUNTROW,REQUEST,INROW,STOCK data
     class RESULT result
 ```
 
@@ -52,35 +54,36 @@ flowchart LR
 
 | Layer | Location | Responsibility in this test |
 |---|---|---|
-| UI | [`src/App.jsx`](../../../src/App.jsx) | Adjustment direction selector maps to inbound/outbound enum |
-| Route / rules | [`movements.controller.ts`](../../../apps/api/src/movements/movements.controller.ts), [`movements.service.ts`](../../../apps/api/src/movements/movements.service.ts) | Direction handling and availability validation |
-| Data model | [`schema.prisma`](../../../apps/api/prisma/schema.prisma) | Separate `ADJUSTMENT_IN` and `ADJUSTMENT_OUT` ledger rows |
-| Stock math | [`stock.ts`](../../../apps/api/src/common/stock.ts) | Inbound adjustment adds; outbound adjustment subtracts |
+| UI | [`src/App.jsx`](../../../src/App.jsx) | Physical count form and manager review actions |
+| Route / rules | [`adjustments.controller.ts`](../../../apps/api/src/movements/adjustments.controller.ts), [`adjustments.service.ts`](../../../apps/api/src/movements/adjustments.service.ts) | Count capture, discrepancy request, stale-count rejection, and approval |
+| Data model | [`schema.prisma`](../../../apps/api/prisma/schema.prisma) | Immutable `StockCount`, linked `AdjustmentRequest`, and ledger movements |
+| Stock math | [`stock.ts`](../../../apps/api/src/common/stock.ts) | Per-location balances and signed ledger calculations |
 
 ## Preconditions and test data
 
-- Sign in with an Admin or Storekeeper account.
-- Use the active test product at **21 units**.
-- Apply `ADJUSTMENT_IN +3`, then `ADJUSTMENT_OUT -2`.
-- Provide a reason/reference that explains the physical count correction.
+- Sign in as a Storekeeper and select an active test product at a known location.
+- Submit an exact count and confirm that it creates history but no adjustment request.
+- Submit a discrepant count and confirm stock does not change until an Admin approves it.
 
 ## Workflow
 
-1. Open **Stock Movements → New movement → Adjustment**.
-2. Choose **Increase stock** and enter `3`; select destination location and save.
-3. Create another adjustment; choose **Decrease stock** and enter `2`; select source location and save.
-4. Re-read the product quantity and the two movements.
+1. Open **Stock Movements → Physical count** and enter the product, location, counted quantity, and reason.
+2. Verify the count stores both the system and counted quantities.
+3. If they differ, verify a pending adjustment request is linked to the count and stock is unchanged.
+4. Approve as a different Admin user and verify one reasoned movement is posted.
+5. Change stock after another count and verify its stale adjustment cannot be approved.
 
 ## Expected results
 
-- Both corrections are persisted as distinct movements with their respective directions.
-- Net change is `+3 - 2 = +1`.
-- Quantity changes from `21` to `22`.
+- Exact counts are retained as immutable evidence and do not post movements.
+- A discrepancy creates a manager-reviewed request linked to its count.
+- Approval is rejected if the ledger balance at that location changed since the count.
+- Approved adjustments create append-only inbound or outbound ledger movements.
 
-## Actual result
+## Automated coverage
 
-Both adjustments were accepted; the quantity changed from **21 to 22**. **PASS.**
+Focused API regression coverage verifies exact counts, both discrepancy directions, approval/rejection, unchanged stock while pending, stale-count rejection, role restrictions, and audit events. The mutation-enabled API suite must run only on a disposable migrated database.
 
 ## Notes
 
-An adjustment is not an edit to a stored quantity: it adds a correction entry to the inventory ledger. Decreases remain subject to stock availability checks.
+Stockkeepers cannot submit arbitrary adjustment quantities or write adjustment movements directly. They report the physical count; the server computes the difference, and the manager approves or rejects the resulting request.

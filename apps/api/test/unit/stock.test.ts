@@ -6,8 +6,10 @@ import { getLocationBalances, getLocationStock, getProductStock, movementSign, s
 test('movementSign classifies inventory movements', () => {
   assert.equal(movementSign(MovementType.PURCHASE_IN), 1);
   assert.equal(movementSign(MovementType.PRODUCTION_IN), 1);
+  assert.equal(movementSign(MovementType.SALE_RETURN_IN), 1);
   assert.equal(movementSign(MovementType.SALE_OUT), -1);
   assert.equal(movementSign(MovementType.LOSS_OUT), -1);
+  assert.equal(movementSign(MovementType.INTERNAL_ISSUE_OUT), -1);
   assert.equal(movementSign(MovementType.TRANSFER), 0);
 });
 
@@ -18,11 +20,12 @@ test('stockByProduct sums incoming and outgoing ledger quantities', async () => 
         { productId: 'p1', type: MovementType.PURCHASE_IN, _sum: { quantity: 12 } },
         { productId: 'p1', type: MovementType.SALE_OUT, _sum: { quantity: 4 } },
         { productId: 'p2', type: MovementType.LOSS_OUT, _sum: { quantity: 2 } },
+        { productId: 'p2', type: MovementType.INTERNAL_ISSUE_OUT, _sum: { quantity: 1 } },
       ],
     },
   };
 
-  assert.deepEqual([...await stockByProduct(db as never)], [['p1', 8], ['p2', -2]]);
+  assert.deepEqual([...await stockByProduct(db as never)], [['p1', 8], ['p2', -3]]);
 });
 
 test('getProductStock never reports a negative quantity', async () => {
@@ -42,10 +45,11 @@ test('location balances apply transfers to source and destination', async () => 
     { type: MovementType.PURCHASE_IN, quantity: 10, fromLocation: null, toLocation: 'Main' },
     { type: MovementType.TRANSFER, quantity: 4, fromLocation: 'Main', toLocation: 'Greenhouse' },
     { type: MovementType.SALE_OUT, quantity: 2, fromLocation: 'Greenhouse', toLocation: null },
+    { type: MovementType.INTERNAL_ISSUE_OUT, quantity: 1, fromLocation: 'Greenhouse', toLocation: null },
   ];
   const db = { inventoryMovement: { findMany: async () => rows } };
 
   assert.equal(await getLocationStock(db as never, 'p1', 'Main'), 6);
-  assert.equal(await getLocationStock(db as never, 'p1', 'Greenhouse'), 2);
-  assert.deepEqual(await getLocationBalances(db as never, 'p1'), [['Main', 6], ['Greenhouse', 2]]);
+  assert.equal(await getLocationStock(db as never, 'p1', 'Greenhouse'), 1);
+  assert.deepEqual(await getLocationBalances(db as never, 'p1'), [['Main', 6], ['Greenhouse', 1]]);
 });

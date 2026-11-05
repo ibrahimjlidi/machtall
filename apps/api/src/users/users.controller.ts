@@ -16,7 +16,9 @@ export class UsersController {
   list() { return this.users.list(); }
 
   @Post()
-  create(@Body() input: CreateUserDto) { return this.users.create(input); }
+  create(@Body() input: CreateUserDto, @Req() request: AuthenticatedRequest) {
+    return this.users.create(input, request.user);
+  }
 
   @Patch(':id')
   update(
@@ -28,7 +30,7 @@ export class UsersController {
   }
 
   @Post(':id/password')
-  resetPassword(@Param('id') id: string, @Body() input: ResetPasswordDto) {
-    return this.users.resetPassword(id, input.password);
+  resetPassword(@Param('id') id: string, @Body() input: ResetPasswordDto, @Req() request: AuthenticatedRequest) {
+    return this.users.resetPassword(id, input.password, request.user);
   }
 }

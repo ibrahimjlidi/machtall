@@ -46,6 +46,7 @@ const movementFromApi = {
   PRODUCTION_IN: 'Production IN',
   SALE_OUT: 'Sale OUT',
   LOSS_OUT: 'Loss OUT',
+  INTERNAL_ISSUE_OUT: 'Internal issue OUT',
   ADJUSTMENT_IN: 'Adjustment IN',
   ADJUSTMENT_OUT: 'Adjustment OUT',
   TRANSFER: 'Transfer',
@@ -58,7 +59,10 @@ const roleToLabel = {
   VIEWER: 'مشاهد',
 };
 
-export function normalizeWorkspace({ products, movements, batches, orders, customers, suppliers, sales }) {
+export function normalizeWorkspace({
+  products, movements, batches, orders, customers, suppliers, sales,
+  supplierQuotes = [], supplierInvoices = [], supplierReturns = [],
+}) {
   return {
     products: products.map((product) => ({
       ...product,
@@ -79,27 +83,67 @@ export function normalizeWorkspace({ products, movements, batches, orders, custo
       stage: batch.stage.toLowerCase(),
       readyDate: batch.expectedReadyDate.slice(0, 10),
       code: batch.code,
+      readyQuantity: batch.readyQuantity,
+      proposalStatus: batch.proposalStatus,
+      reviewNote: batch.reviewNote,
+      careLogs: batch.careLogs || [],
+      lossReports: batch.lossReports || [],
+      tasks: batch.tasks || [],
     })),
     orders: orders.map((order) => ({
       id: order.id,
       code: order.code,
+      supplierId: order.supplierId,
       supplier: order.supplier.name,
       date: order.createdAt.slice(0, 10),
       lines: order.lines.length,
       total: order.lines.reduce((sum, line) => sum + Number(line.unitPrice) * line.quantity, 0),
-      status: order.status[0] + order.status.slice(1).toLowerCase(),
-      linesData: order.lines.map((line) => ({ productId: line.productId, quantity: line.quantity })),
+      status: ({
+        DRAFT: 'Draft',
+        PENDING_APPROVAL: 'Pending approval',
+        APPROVED: 'Approved',
+        REJECTED: 'Rejected',
+        SENT: 'Sent',
+        PARTIALLY_RECEIVED: 'Partially received',
+        RECEIVED: 'Received',
+      })[order.status] || order.status,
+      linesData: order.lines.map((line) => {
+        const receipts = (order.receipts || []).flatMap((receipt) => receipt.lines || [])
+          .filter((receiptLine) => receiptLine.purchaseOrderLineId === line.id);
+        const receivedQuantity = receipts.reduce((sum, receiptLine) => sum + receiptLine.receivedQuantity, 0);
+        return {
+          id: line.id,
+          productId: line.productId,
+          productName: line.product.nameAr,
+          quantity: line.quantity,
+          unitPrice: Number(line.unitPrice),
+          supplierQuoteLineId: line.supplierQuoteLineId,
+          receivedQuantity,
+          damagedQuantity: receipts.reduce((sum, receiptLine) => sum + receiptLine.damagedQuantity, 0),
+          remainingQuantity: line.quantity - receivedQuantity,
+        };
+      }),
     })),
     customers: customers.map((customer) => ({
       ...customer,
       type: customer.type === 'INDIVIDUAL' ? 'فرد' : customer.type === 'LANDSCAPER' ? 'بستاني' : 'بلدية',
     })),
     suppliers,
+    supplierQuotes,
+    supplierInvoices,
+    supplierReturns,
     sales: sales.map((sale) => ({
       ...sale,
       recordId: sale.id,
       id: sale.code,
+      code: sale.code,
       payment: sale.payment.toLowerCase(),
+      lines: sale.lines.map((line) => ({
+        ...line,
+        productName: line.productName,
+        quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice),
+      })),
     })),
     roleLabel: roleToLabel,
   };

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { MovementType, Prisma } from '@prisma/client';
 import { AuthUser } from '../auth/auth.types';
 import { getLocationStock, getProductStock, movementSign } from '../common/stock';
+import { writeAudit } from '../common/audit';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMovementDto } from './movements.dto';
 
@@ -32,12 +33,27 @@ export class MovementsService {
   }
 
   async create(input: CreateMovementDto, user: AuthUser) {
+    if (new Set<MovementType>([
+      MovementType.PURCHASE_IN,
+      MovementType.PRODUCTION_IN,
+      MovementType.SALE_OUT,
+      MovementType.SALE_RETURN_IN,
+      MovementType.ADJUSTMENT_IN,
+      MovementType.ADJUSTMENT_OUT,
+    ]).has(input.type)) {
+      throw new BadRequestException('This movement type must be created by its approved business workflow');
+    }
     return this.prisma.$transaction(async (tx) => {
       const product = await tx.product.findFirst({ where: { id: input.productId, active: true } });
       if (!product) throw new NotFoundException('Product not found');
       const isOut = input.type === MovementType.SALE_OUT ||
         input.type === MovementType.LOSS_OUT ||
+        input.type === MovementType.INTERNAL_ISSUE_OUT ||
         input.type === MovementType.ADJUSTMENT_OUT;
+      if ((input.type === MovementType.LOSS_OUT || input.type === MovementType.INTERNAL_ISSUE_OUT || input.type === MovementType.TRANSFER)
+        && !input.reason?.trim()) {
+        throw new BadRequestException('A reason is required for loss, internal issue, and transfer movements');
+      }
       const fromLocation = input.fromLocation || (isOut ? product.homeLocation : undefined);
       const toLocation = input.toLocation || (!isOut && input.type !== MovementType.TRANSFER ? product.homeLocation : undefined);
       if (isOut && input.quantity > await getProductStock(tx, product.id)) {
@@ -57,7 +73,7 @@ export class MovementsService {
       if (movementSign(input.type) === 0 && input.type !== MovementType.TRANSFER) {
         throw new BadRequestException('Unsupported movement type');
       }
-      return tx.inventoryMovement.create({
+      const movement = await tx.inventoryMovement.create({
         data: {
           productId: product.id,
           type: input.type,
@@ -70,6 +86,14 @@ export class MovementsService {
           createdById: user.sub,
         },
       });
+      await writeAudit(tx, user.sub, 'inventory.movement_created', 'inventory_movement', movement.id, {
+        type: movement.type,
+        productId: product.id,
+        quantity: movement.quantity,
+        reason: movement.reason,
+        reference: movement.reference,
+      });
+      return movement;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }

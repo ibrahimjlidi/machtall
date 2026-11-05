@@ -1,42 +1,44 @@
 # 03 — Create, send, and receive a supplier order
 
-**Result: PASS** · Executed 2026-11-02  
-**Verification:** Authenticated API integration check against PostgreSQL
+**Current scope:** Partial receipts and damaged-goods recording (Phase 4)
+
+**Historical baseline:** Full-quantity receipt passed on 2026-11-02; the current flow adds per-receipt evidence.
 
 ## Purpose
 
-Verify the purchase-order lifecycle and that receiving adds inventory exactly once.
+Verify that actual deliveries are recorded against sent orders, damaged units are linked to losses, partial orders remain open, and cumulative receipts cannot exceed ordered quantities.
 
 ## Project flow
 
 ```mermaid
 flowchart LR
     subgraph FRONTEND["Frontend · React"]
-        USER([Admin / Storekeeper]) --> FORM["Purchase order screen<br/>src/App.jsx"]
+        USER([Purchasing / Storekeeper]) --> FORM["Purchase order screen<br/>src/App.jsx"]
         FORM --> CLIENT["API client<br/>src/api.js"]
-        CLIENT --> SEND["Send order"]
-        SEND --> RECEIVE["Receive order"]
+        CLIENT --> SEND["Purchasing sends order"]
+        SEND --> RECEIVE["Record partial receipt<br/>received + damaged quantities"]
     end
     subgraph BACKEND["Backend · NestJS"]
         GUARD["JWT + role guards"] --> CTRL["PurchasingController"]
         CTRL --> SERVICE["PurchasingService"]
-        SERVICE --> TX["Database transaction<br/>receive once"]
-        TX --> CONFLICT["Already received?<br/>return HTTP 409"]
+        SERVICE --> TX["Lock order and validate<br/>cumulative receipt quantities"]
+        TX --> CONFLICT["Over-receipt or invalid status?<br/>return HTTP 400/409"]
     end
     subgraph DATA["Database · PostgreSQL"]
-        ORDER[(PurchaseOrder)]
+        ORDER[(PurchaseOrder<br/>SENT / PARTIALLY_RECEIVED / RECEIVED)]
         LINE[(PurchaseOrderLine)]
-        MOVEMENT[(InventoryMovement)]
+        RECEIPT[(PurchaseReceipt + lines)]
+        MOVEMENT[(PURCHASE_IN + linked LOSS_OUT)]
         STOCK["stock.ts<br/>derive on-hand quantity"]
     end
-    CLIENT -->|"POST create / PATCH send / PATCH receive"| GUARD
+    CLIENT -->|"POST create / PATCH send / POST receipts"| GUARD
     SERVICE -->|"save draft and lines"| ORDER
     ORDER --> LINE
-    TX -->|"status = RECEIVED"| ORDER
-    TX -->|"PURCHASE_IN per line"| MOVEMENT
-    LINE --> MOVEMENT
+    TX -->|"update cumulative status"| ORDER
+    TX -->|"persist actual receipt"| RECEIPT
+    RECEIPT --> MOVEMENT
     MOVEMENT --> STOCK
-    STOCK --> RESULT["On hand: 15 → 19<br/>duplicate receipt blocked"]
+    STOCK --> RESULT["On hand increases only by good units<br/>duplicate/over receipt blocked"]
     CONFLICT -.-> RESULT
     classDef actor fill:#eef7ef,stroke:#2e7d32,color:#18351b
     classDef ui fill:#e8f5e9,stroke:#2e7d32,color:#18351b
@@ -54,38 +56,38 @@ flowchart LR
 
 | Layer | Location | Responsibility in this test |
 |---|---|---|
-| UI | [`src/App.jsx`](../../../src/App.jsx) | Purchase-order form, send and receive actions |
-| Route / rules | [`purchasing.controller.ts`](../../../apps/api/src/purchasing/purchasing.controller.ts), [`purchasing.service.ts`](../../../apps/api/src/purchasing/purchasing.service.ts) | Draft lifecycle and transactional receiving |
-| Data model | [`schema.prisma`](../../../apps/api/prisma/schema.prisma) | `PurchaseOrder`, `PurchaseOrderLine`, and linked `InventoryMovement` |
+| UI | [`src/App.jsx`](../../../src/App.jsx) | Purchase-order form and per-line receipt form |
+| Route / rules | [`purchasing.controller.ts`](../../../apps/api/src/purchasing/purchasing.controller.ts), [`purchasing.service.ts`](../../../apps/api/src/purchasing/purchasing.service.ts) | Role-gated receipt validation and atomic ledger posting |
+| Data model | [`schema.prisma`](../../../apps/api/prisma/schema.prisma) | `PurchaseReceipt`, receipt lines, order status, and linked `InventoryMovement` |
 | Stock math | [`stock.ts`](../../../apps/api/src/common/stock.ts) | Receipt movements increase product/location balance |
 
 ## Preconditions and test data
 
-- Sign in with an Admin account.
-- Select an active seeded supplier and the active test product.
+- Sign in with a Storekeeper account.
+- Prepare an order using an active seeded supplier and the active test product; have a manager approve it and Purchasing send it.
 - Product quantity before receipt: **15**.
-- Create an order with one line: **4 units** of the test product.
+- Sent order line: **4 units** of the test product.
 
 ## Workflow
 
-1. Open **Purchases** and create an order for the selected supplier.
-2. Add the test product and quantity `4`; save as a draft.
-3. Send the purchase order.
-4. Receive the order.
-5. Refresh the product catalog and verify the quantity.
-6. Attempt to receive the same order again.
+1. As Purchasing, create a purchase order with the test product and quantity `4`.
+2. Have the manager approve it, then have Purchasing send it.
+3. As Storekeeper, record an initial delivery of `2` units, including `1` damaged unit.
+4. Confirm the order is `PARTIALLY_RECEIVED`; only one good unit has been added to stock.
+5. Receive the remaining `2` units and confirm the order becomes `RECEIVED`.
+6. Attempt an over-receipt and a further receipt after completion.
 
 ## Expected results
 
-- Order status transitions from `DRAFT` to `SENT` to `RECEIVED`.
-- The receiving operation writes an inbound movement linked to the order line.
-- Stock changes from `15` to `19`.
-- Repeated receipt is rejected and creates no second inbound movement.
+- Order status transitions from `SENT` to `PARTIALLY_RECEIVED` to `RECEIVED`.
+- Each receipt writes an inbound movement for the full arrived quantity; damaged units write a linked `LOSS_OUT`.
+- Stock changes from `15` to `18` in this example (four delivered, one damaged).
+- Over-receipt and post-completion receipt attempts are rejected without extra ledger entries.
 
 ## Actual result
 
-The order moved through all three statuses. Stock increased from **15 to 19**. The second receive attempt returned **HTTP 409 Conflict** and did not increase stock again. **PASS.**
+The automated API and UI regression cases cover partial receipt, damaged quantity, cumulative over-receipt rejection, and receipt role restrictions. Run the API suite only against the documented disposable test database; it was not run against live/VPS data for this phase.
 
 ## Notes
 
-The order record and its inventory movements are written transactionally. A received order is not eligible for another receipt.
+Receipt data, ledger movements, and order status are committed together. Existing fully received orders remain historical records; receipt editing/deletion and direct movement editing/deletion are prohibited.

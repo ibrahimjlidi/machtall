@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthUser } from '../auth/auth.types';
+import { writeAudit } from '../common/audit';
 import { SaveCategoryDto } from './categories.dto';
 
 @Injectable()
@@ -11,7 +13,7 @@ export class CategoriesService {
     return this.prisma.category.findMany({ orderBy: { nameAr: 'asc' } });
   }
 
-  async create(input: SaveCategoryDto) {
+  async create(input: SaveCategoryDto, user: AuthUser) {
     const names = this.normalizedNames(input);
     await this.ensureNamesAvailable(names.nameAr, names.nameFr);
     const slugBase = names.nameFr.normalize('NFD')
@@ -20,11 +22,15 @@ export class CategoriesService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'category';
     try {
-      return await this.prisma.category.create({
-        data: {
-          ...names,
-          slug: `${slugBase}-${Date.now().toString(36)}`,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const category = await tx.category.create({
+          data: {
+            ...names,
+            slug: `${slugBase}-${Date.now().toString(36)}`,
+          },
+        });
+        await writeAudit(tx, user.sub, 'category.created', 'category', category.id, names);
+        return category;
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -34,15 +40,22 @@ export class CategoriesService {
     }
   }
 
-  async update(id: string, input: SaveCategoryDto) {
+  async update(id: string, input: SaveCategoryDto, user: AuthUser) {
     const current = await this.prisma.category.findUnique({ where: { id } });
     if (!current) throw new NotFoundException('Category not found');
     const names = this.normalizedNames(input);
     await this.ensureNamesAvailable(names.nameAr, names.nameFr, id);
-    return this.prisma.category.update({ where: { id }, data: names });
+    return this.prisma.$transaction(async (tx) => {
+      const category = await tx.category.update({ where: { id }, data: names });
+      await writeAudit(tx, user.sub, 'category.updated', 'category', id, {
+        before: { nameAr: current.nameAr, nameFr: current.nameFr },
+        after: names,
+      });
+      return category;
+    });
   }
 
-  async remove(id: string) {
+  async remove(id: string, user: AuthUser) {
     const category = await this.prisma.category.findUnique({
       where: { id },
       include: { _count: { select: { products: true } } },
@@ -51,8 +64,14 @@ export class CategoriesService {
     if (category._count.products > 0) {
       throw new ConflictException('Reassign all products in this category before deleting it');
     }
-    await this.prisma.category.delete({ where: { id } });
-    return { success: true };
+    return this.prisma.$transaction(async (tx) => {
+      await tx.category.delete({ where: { id } });
+      await writeAudit(tx, user.sub, 'category.deleted', 'category', id, {
+        nameAr: category.nameAr,
+        nameFr: category.nameFr,
+      });
+      return { success: true };
+    });
   }
 
   private normalizedNames(input: SaveCategoryDto) {

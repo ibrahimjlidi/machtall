@@ -1,17 +1,17 @@
-import { Body, Controller, Delete, Get, Module, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Module, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { AuthModule } from '../auth/auth.module';
+import { AuthenticatedRequest } from '../auth/auth.guard';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { PrismaService } from '../prisma/prisma.service';
 import { SaveCategoryDto } from './categories.dto';
 import { CategoriesService } from './categories.service';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 class ReferenceController {
-  constructor(private readonly prisma: PrismaService, private readonly categoriesService: CategoriesService) {}
+  constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get('categories')
   categories() {
@@ -20,26 +20,22 @@ class ReferenceController {
 
   @Post('categories')
   @Roles(UserRole.ADMIN)
-  createCategory(@Body() input: SaveCategoryDto) {
-    return this.categoriesService.create(input);
+  createCategory(@Body() input: SaveCategoryDto, @Req() request: AuthenticatedRequest) {
+    return this.categoriesService.create(input, request.user);
   }
 
   @Patch('categories/:id')
   @Roles(UserRole.ADMIN)
-  updateCategory(@Param('id') id: string, @Body() input: SaveCategoryDto) {
-    return this.categoriesService.update(id, input);
+  updateCategory(@Param('id') id: string, @Body() input: SaveCategoryDto, @Req() request: AuthenticatedRequest) {
+    return this.categoriesService.update(id, input, request.user);
   }
 
   @Delete('categories/:id')
   @Roles(UserRole.ADMIN)
-  deleteCategory(@Param('id') id: string) {
-    return this.categoriesService.remove(id);
+  deleteCategory(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.categoriesService.remove(id, request.user);
   }
 
-  @Get('suppliers')
-  suppliers() {
-    return this.prisma.supplier.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
-  }
 }
 
 @Module({

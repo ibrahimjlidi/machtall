@@ -30,9 +30,13 @@ jobs:
       COOKIE_SECURE: "false"
       SEED_ADMIN_EMAIL: owner@ci.test
       SEED_ADMIN_PASSWORD: ci-only-owner-password-2026
+      SEED_VIEWER_EMAIL: viewer@ci.test
+      SEED_VIEWER_PASSWORD: ci-only-viewer-password-2026
       API_BASE_URL: http://127.0.0.1:3000/api
       TEST_ADMIN_EMAIL: owner@ci.test
       TEST_ADMIN_PASSWORD: ci-only-owner-password-2026
+      TEST_VIEWER_EMAIL: viewer@ci.test
+      TEST_VIEWER_PASSWORD: ci-only-viewer-password-2026
       ALLOW_TEST_DATA_MUTATION: "true"
     steps:
       - uses: actions/checkout@v4

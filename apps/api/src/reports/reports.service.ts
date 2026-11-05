@@ -1,5 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { MovementType, PaymentStatus } from '@prisma/client';
+import {
+  CashLedgerEntryType,
+  ExpenseStatus,
+  MovementType,
+  PaymentStatus,
+  SaleApprovalStatus,
+  SalesReturnStatus,
+  SupplierInvoiceStatus,
+} from '@prisma/client';
 import { stockByProduct } from '../common/stock';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportQueryDto } from './reports.dto';
@@ -24,18 +32,24 @@ export class ReportsService {
     }
     const createdAt = { gte: from, lt: endExclusive };
 
-    const [products, sales, losses, creditSales, customers, stock] = await Promise.all([
+    const [products, sales, losses, creditSales, customers, stock, expensesByCategory, expensePayments,
+      supplierPayments, customerPayments, supplierInvoices, cashEntries, cashSessions, unknownAmountInvoices,
+      approvedExpensesWithPayments] = await Promise.all([
       this.prisma.product.findMany({
         where: { active: true },
         include: { category: { select: { nameAr: true, nameFr: true } } },
         orderBy: { sku: 'asc' },
       }),
       this.prisma.sale.findMany({
-        where: { createdAt },
+        where: { createdAt, approvalStatus: SaleApprovalStatus.APPROVED },
         include: {
           customer: { select: { id: true, name: true, type: true } },
           lines: { include: { product: { select: { id: true, nameAr: true, nameFr: true, sku: true } } } },
           paymentAllocations: { select: { amount: true } },
+          returns: {
+            where: { status: { in: [SalesReturnStatus.APPROVED, SalesReturnStatus.COMPLETED] } },
+            include: { lines: { include: { saleLine: { select: { id: true, productId: true, unitPrice: true } } } } },
+          },
         },
         orderBy: { createdAt: 'asc' },
       }),
@@ -45,10 +59,14 @@ export class ReportsService {
         orderBy: { effectiveAt: 'asc' },
       }),
       this.prisma.sale.findMany({
-        where: { payment: PaymentStatus.CREDIT },
+        where: { payment: PaymentStatus.CREDIT, approvalStatus: SaleApprovalStatus.APPROVED },
         include: {
           lines: { select: { quantity: true, unitPrice: true } },
           paymentAllocations: { select: { amount: true } },
+          returns: {
+            where: { status: { in: [SalesReturnStatus.APPROVED, SalesReturnStatus.COMPLETED] } },
+            include: { lines: { include: { saleLine: { select: { unitPrice: true } } } } },
+          },
         },
       }),
       this.prisma.customer.findMany({
@@ -59,6 +77,44 @@ export class ReportsService {
         },
       }),
       stockByProduct(this.prisma),
+      this.prisma.expense.groupBy({
+        by: ['category'],
+        where: { status: ExpenseStatus.APPROVED, incurredAt: { gte: from, lt: endExclusive } },
+        _count: { _all: true },
+        _sum: { amount: true },
+        orderBy: { category: 'asc' },
+      }),
+      this.prisma.expensePayment.aggregate({
+        where: { paidAt: { gte: from, lt: endExclusive } },
+        _sum: { amount: true },
+      }),
+      this.prisma.supplierPayment.aggregate({
+        where: { paidAt: { gte: from, lt: endExclusive } },
+        _sum: { amount: true },
+      }),
+      this.prisma.customerPayment.aggregate({
+        where: { receivedAt: { gte: from, lt: endExclusive } },
+        _sum: { amount: true },
+      }),
+      this.prisma.supplierInvoice.findMany({
+        where: { status: SupplierInvoiceStatus.REVIEWED, totalAmount: { not: null } },
+        select: { totalAmount: true, payments: { select: { amount: true } } },
+      }),
+      this.prisma.cashLedgerEntry.findMany({
+        where: { createdAt },
+        select: { type: true, amount: true },
+      }),
+      this.prisma.cashSession.findMany({
+        where: { closedAt: { gte: from, lt: endExclusive } },
+        select: { variance: true, reviewedAt: true, varianceApprovedAt: true },
+      }),
+      this.prisma.supplierInvoice.count({
+        where: { status: SupplierInvoiceStatus.REVIEWED, totalAmount: null },
+      }),
+      this.prisma.expense.findMany({
+        where: { status: ExpenseStatus.APPROVED },
+        select: { amount: true, payments: { select: { amount: true } } },
+      }),
     ]);
 
     const inventory = products.map((product) => {
@@ -85,7 +141,12 @@ export class ReportsService {
     const salesByProduct = new Map<string, { productId: string; sku: string; productAr: string; productFr: string; quantity: number; total: number }>();
     let salesTotal = 0;
     for (const sale of sales) {
-      const total = sale.lines.reduce((sum, line) => sum + Number(line.unitPrice) * line.quantity, 0);
+      const grossTotal = sale.lines.reduce((sum, line) => sum + Number(line.unitPrice) * line.quantity, 0);
+      const totalReturned = sale.returns.reduce((sum, item) => sum + item.lines.reduce(
+        (amount, line) => amount + Number(line.saleLine.unitPrice) * line.quantity,
+        0,
+      ), 0);
+      const total = Math.max(0, grossTotal - totalReturned);
       salesTotal += total;
       const salesDay = day(sale.createdAt);
       const daily = salesByDay.get(salesDay) ?? { date: salesDay, count: 0, total: 0 };
@@ -101,6 +162,10 @@ export class ReportsService {
       salesByCustomer.set(sale.customerId, customer);
 
       for (const line of sale.lines) {
+        const returnedQuantity = sale.returns.reduce((sum, item) => sum + item.lines
+          .filter((returned) => returned.saleLine.id === line.id)
+          .reduce((quantity, returned) => quantity + returned.quantity, 0), 0);
+        const netQuantity = Math.max(0, line.quantity - returnedQuantity);
         const product = salesByProduct.get(line.productId) ?? {
           productId: line.productId,
           sku: line.product.sku,
@@ -109,8 +174,8 @@ export class ReportsService {
           quantity: 0,
           total: 0,
         };
-        product.quantity += line.quantity;
-        product.total += Number(line.unitPrice) * line.quantity;
+        product.quantity += netQuantity;
+        product.total += Number(line.unitPrice) * netQuantity;
         salesByProduct.set(line.productId, product);
       }
     }
@@ -136,7 +201,11 @@ export class ReportsService {
     const creditOutstanding = creditSales.reduce((sum, sale) => {
       const total = sale.lines.reduce((amount, line) => amount + Number(line.unitPrice) * line.quantity, 0);
       const received = sale.paymentAllocations.reduce((amount, allocation) => amount + Number(allocation.amount), 0);
-      return sum + Math.max(0, total - received);
+      const returned = sale.returns.reduce((amount, item) => amount + item.lines.reduce(
+        (lineTotal, line) => lineTotal + Number(line.saleLine.unitPrice) * line.quantity,
+        0,
+      ), 0);
+      return sum + Math.max(0, total - received - returned);
     }, 0) + customers.reduce((sum, customer) => {
       const received = customer.payments.reduce(
         (amount, payment) => amount + payment.allocations.reduce(
@@ -148,6 +217,24 @@ export class ReportsService {
       return sum + Math.max(0, Number(customer.openingCredit) - received);
     }, 0);
 
+    const expensesTotal = expensesByCategory.reduce((sum, expense) => sum + Number(expense._sum.amount ?? 0), 0);
+    const expensePayableOutstanding = approvedExpensesWithPayments.reduce((sum, expense) => {
+      const paid = expense.payments.reduce((amount, payment) => amount + Number(payment.amount), 0);
+      return sum + Math.max(0, Number(expense.amount) - paid);
+    }, 0);
+    const supplierPayableOutstanding = supplierInvoices.reduce((sum, invoice) => {
+      const paid = invoice.payments.reduce((amount, payment) => amount + Number(payment.amount), 0);
+      return sum + Math.max(0, Number(invoice.totalAmount ?? 0) - paid);
+    }, 0);
+    const cashIn = cashEntries
+      .filter((entry) => entry.type === CashLedgerEntryType.SALE || entry.type === CashLedgerEntryType.CUSTOMER_PAYMENT)
+      .reduce((sum, entry) => sum + Number(entry.amount), 0);
+    const cashOut = cashEntries
+      .filter((entry) => entry.type === CashLedgerEntryType.REFUND
+        || entry.type === CashLedgerEntryType.SUPPLIER_PAYMENT
+        || entry.type === CashLedgerEntryType.EXPENSE_PAYMENT)
+      .reduce((sum, entry) => sum + Number(entry.amount), 0);
+
     return {
       from: day(from),
       to: day(to),
@@ -155,6 +242,24 @@ export class ReportsService {
         salesCount: sales.length,
         salesTotal,
         creditOutstanding,
+        customerCollections: Number(customerPayments._sum.amount ?? 0),
+        approvedExpenses: expensesTotal,
+        expensePayableOutstanding,
+        expensePayments: Number(expensePayments._sum.amount ?? 0),
+        supplierPayments: Number(supplierPayments._sum.amount ?? 0),
+        supplierPayableOutstanding,
+        reviewedInvoicesWithoutAmounts: unknownAmountInvoices,
+        cashIn,
+        cashOut,
+        cashNet: cashIn - cashOut,
+        cashSessionsClosed: cashSessions.length,
+        cashVarianceTotal: cashSessions.reduce((sum, session) => sum + Number(session.variance ?? 0), 0),
+        cashSessionsPendingReview: cashSessions.filter((session) => !session.reviewedAt).length,
+        cashVariancesPendingApproval: cashSessions.filter((session) =>
+          session.variance !== null && !session.variance.isZero() && !session.varianceApprovedAt).length,
+        profitAvailable: false,
+        vatApplied: false,
+        financialReportNotice: 'Operational summary only; VAT is not applied and profit is unavailable until inventory cost accounting is implemented.',
         inventoryProducts: inventory.length,
         inventoryUnits: inventory.reduce((sum, product) => sum + product.quantity, 0),
         inventoryValue: inventory.reduce((sum, product) => sum + product.stockValue, 0),
@@ -166,6 +271,11 @@ export class ReportsService {
       salesByProduct: [...salesByProduct.values()].sort((a, b) => b.quantity - a.quantity),
       losses: lossDetails,
       lossesByReason: [...lossesByReason.values()].sort((a, b) => b.quantity - a.quantity),
+      expensesByCategory: expensesByCategory.map((expense) => ({
+        category: expense.category,
+        count: expense._count._all,
+        amount: Number(expense._sum.amount ?? 0),
+      })),
     };
   }
 }
