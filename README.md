@@ -53,25 +53,6 @@ The API and database have no host-published ports; the browser reaches the API t
 
 For an internet-facing deployment, configure a trusted reverse proxy with HTTPS and forward it to `127.0.0.1:${APP_PORT}`. Set `COOKIE_SECURE=true`, allow public ingress only on the TLS proxy ports, replace every example secret with unique random values, and rotate any credentials that have ever been shared or used as placeholders. The API now refuses placeholder JWT/database credentials; the demo seed also refuses placeholder admin passwords. Local Compose sets `COOKIE_SECURE=false` solely because localhost is plain HTTP.
 
-### GitHub Actions production deployment
-
-Every branch push and every pull request targeting `main` runs the unit tests, isolated API end-to-end tests, Playwright tests, and production builds. For pushes to `main`, only after all checks pass does GitHub Actions publish commit-pinned API, migration, and web images to GitHub Container Registry. Production deployment then pauses for approval in the GitHub `production` environment. Configure required reviewers for that environment in repository Settings; merely naming the environment in the workflow does not enable an approval gate.
-
-Configure these production environment variables:
-
-- `PRODUCTION_HOST`: the VPS DNS name or IPv4 address.
-- `PRODUCTION_USER`: the SSH account that can run Docker Compose.
-- `PRODUCTION_DEPLOY_PATH`: the absolute path to the existing Compose deployment directory (for example `/home/ubuntu/machtall`). Keep this path/project name stable so Compose continues using the existing PostgreSQL volume.
-- `PRODUCTION_GHCR_USER`: GitHub username used for image pulls.
-
-Configure these production environment secrets:
-
-- `PRODUCTION_SSH_PRIVATE_KEY`: a dedicated SSH private key whose public key is authorized for the deployment account.
-- `PRODUCTION_KNOWN_HOSTS`: the verified SSH host-key line for the VPS. Obtain and verify its fingerprint out-of-band; do not trust an unverified `ssh-keyscan` result.
-- `PRODUCTION_GHCR_TOKEN`: a narrowly scoped token with `read:packages` access to the published images.
-
-The existing VPS deployment directory must already contain its private `.env` file with the production database and application secrets. The deployment uploads the committed Compose configuration, pulls the images for that exact commit, writes a pre-deploy PostgreSQL dump under `backups/`, runs `prisma migrate deploy` through the one-off migration image, and waits for the API and web health checks. Keep schema migrations backward-compatible with the currently running API during deployment; destructive/contract migrations need a separate rollout. A failed test or build cannot reach the production approval/deploy jobs. The pre-deploy dump is stored on the VPS and is not an off-site backup; continue maintaining encrypted off-site backups and tested restore procedures.
-
 ### Backups and restore checks
 
 Take regular PostgreSQL backups and copy them off the VPS using encrypted storage. Restrict local backup-file permissions and test restore into a separate, empty database before relying on a backup:
