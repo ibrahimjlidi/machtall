@@ -3,7 +3,7 @@ services:
     name: machtall-api
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run db:generate && npm run api:build && DATABASE_URL="$DATABASE_URL_UNPOOLED" npm run db:migrate
+    buildCommand: npm ci --include=dev && npm run db:generate && npm run api:build && DATABASE_URL="$DATABASE_URL_UNPOOLED" npm run db:migrate
     startCommand: npm run start --workspace @mashtal/api
     healthCheckPath: /api/health
     autoDeployTrigger: commit
