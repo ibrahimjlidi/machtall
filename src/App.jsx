@@ -865,7 +865,6 @@ export default function App() {
       notify(error.message);
     }
   };
-
   const recordProductionCare = async ({ batch, type, performedAt, note }) => {
     try {
       await apiRequest(`/production/batches/${batch.id}/care-logs`, {
@@ -1312,7 +1311,7 @@ export default function App() {
       (!productSize || product.size === productSize) && (!productStatus || status === productStatus);
   });
   const filteredMovements = movements.filter((m) => (!movementFilter || (movementFilter === 'Adjustment' ? m.type.startsWith('Adjustment') : m.type === movementFilter)) &&
-    (!query || `${m.reference} ${m.reason} ${productById(m.productId)?.nameAr || ''}`.toLowerCase().includes(query.toLowerCase())));
+    (!query || `${m.reference} ${m.reason} ${productById(m.productId)?.nameAr || ''}`.toLowerCase().includes(query.toLowerCase()));
 
   const showMovementModal = (seedType = '') => setModal({ type: 'movement', seedType });
   const firstProductName = (id) => (productById(id)?.[isRtl ? 'nameAr' : 'nameFr'] || productById(id)?.nameAr || '—');
@@ -1335,13 +1334,22 @@ export default function App() {
     const catData = categories.map((category) => ({
       name: categoryLabel(category.nameAr), value: products.filter((p) => p.category === category.nameAr).reduce((sum, p) => sum + getQty(p.id) * p.purchasePrice, 0),
     })).filter((item) => item.value > 0).sort((a, b) => b.value - a.value).slice(0, 6);
-    const salesData = [
-      { month: isRtl ? 'جانفي' : 'Janv.', sales: 3250 }, { month: isRtl ? 'فيفري' : 'Févr.', sales: 4180 }, { month: isRtl ? 'مارس' : 'Mars', sales: 7620 },
-      { month: isRtl ? 'أفريل' : 'Avr.', sales: 9840 }, { month: isRtl ? 'ماي' : 'Mai', sales: 11200 }, { month: isRtl ? 'جوان' : 'Juin', sales: 7650 },
-      { month: isRtl ? 'جويلية' : 'Juil.', sales: 5890 }, { month: isRtl ? 'أوت' : 'Août', sales: 5120 }, { month: isRtl ? 'سبتمبر' : 'Sept.', sales: 8230 },
-      { month: isRtl ? 'أكتوبر' : 'Oct.', sales: 10450 }, { month: isRtl ? 'نوفمبر' : 'Nov.', sales: 7830 }, { month: isRtl ? 'ديسمبر' : 'Déc.', sales: 4360 },
-    ];
+    const monthLabels = isRtl
+      ? ['جانفي', 'فيفري', 'مارس', 'أفريل', 'ماي', 'جوان', 'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+      : ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
+    const currentYear = new Date().getFullYear();
+    const salesData = monthLabels.map((month, index) => ({
+      month,
+      sales: sales
+        .filter((sale) => sale.approvalStatus === 'APPROVED' && sale.date.slice(0, 7) === `${currentYear}-${String(index + 1).padStart(2, '0')}`)
+        .reduce((sum, sale) => sum + Math.max(0, sale.total - sale.returnedAmount), 0),
+    }));
     const colors = ['#2E7D32', '#75A86D', '#F9A825', '#8D6E63', '#63A9A1', '#A4C676'];
+    const lowStockPanel = hasRole('ADMIN', 'STOREKEEPER', 'SELLER', 'PURCHASING', 'VIEWER') ? <section className="h-full rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-4 flex items-center justify-between"><h2 className="font-extrabold text-slate-800 dark:text-white">{t('lowStockList')}</h2><button onClick={() => navigate('products')} className="text-xs font-bold text-forest">{t('seeAll')} <ChevronLeft size={13} className="inline" /></button></div>
+      <div className="space-y-3">{lowProducts.slice(0, 5).map((product) => <div key={product.id} className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-50 text-forest"><Leaf size={17} /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200">{firstProductName(product.id)}</p><p className="text-[10px] text-slate-400">{product.location}</p></div><Badge tone={getQty(product.id) === 0 ? 'red' : 'amber'}>{getQty(product.id)} / {product.minimum}</Badge></div>)}
+      {!lowProducts.length && <Empty text={t('noResults')} />}</div>
+    </section> : null;
     return <div className="space-y-5">
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="mb-1 text-sm font-semibold text-slate-400">{t('today')} · {new Date().toLocaleDateString(isRtl ? 'ar-TN' : 'fr-TN', { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">{t('welcome')} <span className="text-2xl">🌿</span></h1><p className="mt-1 text-sm text-slate-500">{t('welcomeSub')}</p></div>
@@ -1350,11 +1358,6 @@ export default function App() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metricCards.map((card, index) => <div key={card.title} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-start justify-between"><span className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.color}`}><card.icon size={20} /></span><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${card.positive ? 'bg-green-50 text-green-700' : 'bg-slate-50 text-slate-500'}`}>{card.positive && <span className="me-1">↗</span>}{card.change}</span></div>
-          <p className="mt-4 text-xs font-semibold text-slate-500">{card.title}</p><p className={`${index === 1 || index === 4 ? 'text-[17px]' : 'text-2xl'} mt-1 font-extrabold text-slate-800 dark:text-white`}>{card.value} <span className="text-xs font-medium text-slate-400">{card.suffix}</span></p>
-        </div>)}
-      </div>
-      <Suspense fallback={<div className="min-h-72 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" aria-busy="true" />}>
-        <DashboardCharts
           flowData={flowData}
           catData={catData}
           salesData={salesData}
@@ -1398,7 +1401,7 @@ export default function App() {
   const renderMovements = () => <div className="space-y-5">
     <PageHeading title={t('movements')} subtitle={`${movements.length} ${t('rows')} · ${t('overviewPeriod')}`} action={<div className="flex flex-wrap gap-2">{hasRole('ADMIN', 'STOREKEEPER') && <button onClick={() => showMovementModal()} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><Plus size={17} />{t('newMovement')}</button>}{hasRole('STOREKEEPER') && <button onClick={() => setModal({ type: 'stockCount' })} className="inline-flex items-center gap-2 rounded-xl border border-forest px-4 py-2.5 text-sm font-bold text-forest"><Plus size={17} />{t('stockCount')}</button>}<button onClick={() => downloadCsv(`movements-${new Date().toISOString().slice(0, 10)}.csv`, [[t('date'), t('product'), t('movementType'), t('amount'), t('reason'), t('location'), t('reference')], ...filteredMovements.map((item) => [item.date, firstProductName(item.productId), movementTypeLabel(item.type, t), item.quantity, item.reason, item.location, item.reference])])} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 dark:border-slate-600 dark:text-slate-200"><Download size={16} />{t('exportMovements')}</button></div>} />
     <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800">
-      <label className="relative min-w-[220px] flex-1"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('searchProducts')} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pe-9 ps-3 text-xs outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-white" /></label>
+      <label className="relative min-w-[220px] flex-1"><Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('searchProducts')} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pe-9 ps-3 text-xs outline-none focus:border-green-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" /></label>
       <select value={movementFilter} onChange={(e) => setMovementFilter(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-white"><option value="">{t('allTypes')}</option>{['Purchase IN', 'Production IN', 'Sale OUT', 'Loss OUT', 'Internal issue OUT', 'Adjustment', 'Transfer'].map((type) => <option key={type} value={type}>{movementTypeLabel(type, t)}</option>)}</select>
       <button onClick={() => { setQuery(''); setMovementFilter(''); }} className="rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-500 dark:border-slate-600">{t('filter')}</button>
     </div>
@@ -1513,7 +1516,7 @@ export default function App() {
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span className="flex items-center gap-1"><Building2 size={13} />{supplier.city}</span><span dir="ltr">{supplier.phone}</span></div>
         {supplier.email && <p className="mt-1 text-xs text-slate-500" dir="ltr">{supplier.email}</p>}
         {hasRole('ADMIN', 'PURCHASING') && <div className="mt-3 flex gap-2">
-          <button onClick={() => setModal({ type: 'supplier', item: supplier })} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold">{t('edit')}</button>
+          <button onClick={() => setModal({ type: 'supplier', item: supplier })} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 dark:bg-slate-700 dark:text-white">{t('edit')}</button>
           <button onClick={() => archiveSupplier(supplier)} className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700">{t('archive')}</button>
         </div>}
       </div>)}</div>
@@ -1521,7 +1524,7 @@ export default function App() {
     </section>
     <div className="grid gap-5 xl:grid-cols-2">
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="mb-4 font-extrabold">{t('supplierQuotes')}</h2>
+        <h2 className="mb-4 font-extrabold text-slate-800 dark:text-white">{t('supplierQuotes')}</h2>
         <div className="space-y-3">{supplierQuotes.map((quote) => <div key={quote.id} className="rounded-xl border border-slate-100 p-4 dark:border-slate-700">
           <div className="flex flex-wrap justify-between gap-2"><b>{quote.supplier.name} · <span dir="ltr">{quote.reference}</span></b><span className="text-xs text-slate-500">{dateLabel(quote.quoteDate)}</span></div>
           {quote.validUntil && <p className="mt-1 text-xs text-slate-500">{t('validUntil')}: {dateLabel(quote.validUntil)}</p>}
@@ -1530,259 +1533,44 @@ export default function App() {
         {!supplierQuotes.length && <Empty text={t('noResults')} />}
       </section>
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="mb-2 font-extrabold">{t('supplierInvoices')}</h2>
+        <h2 className="mb-2 font-extrabold text-slate-800 dark:text-white">{t('supplierInvoices')}</h2>
         <p className="mb-4 text-xs text-slate-500">{t('vatNotApplied')}</p>
-        <div className="space-y-3">{supplierInvoices.map((invoice) => <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-4 dark:border-slate-700">
-          <div><b>{invoice.supplier.name} · <span dir="ltr">{invoice.reference}</span></b><p className="mt-1 text-xs text-slate-500">{invoice.purchaseOrder?.code || '—'} · {invoice.invoiceDate ? dateLabel(invoice.invoiceDate) : dateLabel(invoice.createdAt)} · {invoice.totalAmount == null ? t('invoiceBalanceUnknown') : currency(invoice.totalAmount)}</p></div>
-          <div className="flex items-center gap-2"><Badge tone={invoice.status === 'REVIEWED' ? 'green' : 'amber'}>{t(invoice.status.toLowerCase())}</Badge>{invoice.status === 'RECORDED' && hasRole('ADMIN', 'ACCOUNTANT') && <button onClick={() => reviewSupplierInvoice(invoice)} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs font-bold text-forest">{t('reviewInvoice')}</button>}</div>
-        </div>)}</div>
+        <div className="space-y-3">{supplierInvoices.map((invoice) => {
+          const balance = invoice.totalAmount === null ? null : supplierInvoiceBalance(invoice);
+          return <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-4 dark:border-slate-700">
+            <div><b>{invoice.supplier.name} · <span dir="ltr">{invoice.reference}</span></b>
+              <p className="mt-1 text-xs text-slate-500">{invoice.totalAmount === null ? t('invoiceBalanceUnknown') : `${t('invoiceAmount')}: ${currency(invoice.totalAmount)} · ${t('supplierBalance')}: ${currency(balance)}`}</p></div>
+            <div className="flex items-center gap-2"><Badge tone={invoice.status === 'REVIEWED' ? 'green' : 'amber'}>{t(invoice.status.toLowerCase())}</Badge>
+              {invoice.status === 'REVIEWED' && balance > 0 && hasRole('ACCOUNTANT') && <button onClick={() => setModal({ type: 'accountingPayment', document: { ...invoice, balance }, documentType: 'supplier' })} className="rounded-lg bg-forest px-3 py-1.5 text-xs font-bold text-white">{t('payInvoice')}</button>}
+            </div>
+          </div>;
+        })}</div>
         {!supplierInvoices.length && <Empty text={t('noResults')} />}
       </section>
     </div>
     <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-      <h2 className="mb-2 font-extrabold">{t('supplierReturns')}</h2>
-      <p className="mb-4 text-xs text-slate-500">{t('noReturnStockPosting')}</p>
-      <div className="space-y-3">{supplierReturns.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-4 dark:border-slate-700">
-        <div className="min-w-[220px] flex-1"><b>{item.supplier.name}{item.supplierReference ? ` · ${item.supplierReference}` : ''}</b><p className="mt-1 text-xs text-slate-500">{item.purchaseOrder?.code || '—'} · {item.reason}</p><p className="mt-1 text-xs text-slate-500">{item.lines.map((line) => `${line.product.nameAr} × ${line.quantity}`).join(' · ')}</p></div>
-        <div className="flex items-center gap-2"><Badge tone={item.status === 'APPROVED' ? 'green' : item.status === 'REJECTED' ? 'red' : 'amber'}>{t(item.status === 'PENDING_APPROVAL' ? 'pendingApproval' : item.status.toLowerCase())}</Badge>{item.status === 'PENDING_APPROVAL' && hasRole('ADMIN') && <><button onClick={() => approveSupplierReturn(item)} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs font-bold text-forest">{t('approve')}</button><button onClick={() => setModal({ type: 'reviewReason', item, onSave: rejectSupplierReturn })} className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700">{t('reject')}</button></>}</div>
+      <h2 className="mb-2 font-extrabold">{t('cashReview')}</h2>
+      <div className="space-y-3">{closedSessions.map((session) => <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-4 dark:border-slate-700">
+        <div><b>{session.user.name} · {dateLabel(session.closedAt)}</b><p className="mt-1 text-xs text-slate-500">{t('expectedCash')}: {currency(session.expectedCash)} · {t('closingCash')}: {currency(session.closingCash)} · {t('variance')}: {currency(session.variance)}</p>
+          {session.reviewedAt && <p className="mt-1 text-xs text-slate-500">{t('reviewCashSession')}: {session.reviewedBy?.name || '—'}</p>}</div>
+        <div className="flex flex-wrap gap-2">
+          {!session.reviewedAt && hasRole('ACCOUNTANT') && <button onClick={() => reviewCashSession(session)} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">{t('reviewCashSession')}</button>}
+          {session.reviewedAt && sessionVariance(session) !== 0 && !session.varianceApprovedAt && hasRole('ADMIN') && <button onClick={() => approveCashVariance(session)} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">{t('approveVariance')}</button>}
+          {session.varianceApprovedAt && <Badge tone="green">{t('approveVariance')}</Badge>}
+        </div>
       </div>)}</div>
-      {!supplierReturns.length && <Empty text={t('noResults')} />}
+      {!closedSessions.length && <Empty text={t('noResults')} />}
     </section>
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-      <div className="mb-4 flex items-center justify-between"><h2 className="font-extrabold text-slate-800 dark:text-white">{t('purchaseOrders')}</h2><span className="text-xs text-slate-400">{orders.filter((o) => !['Received', 'Rejected'].includes(o.status)).length} {t('pending')}</span></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-right text-xs">
-        <thead className="bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-700/70"><tr>{[t('order'), t('supplier'), t('date'), t('lines'), t('total'), t('status'), t('actions')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">{orders.map((order) => <tr key={order.id}>
-          <td className="px-4 py-4 font-extrabold text-forest" dir="ltr">{order.code || order.id}</td><td className="px-4 py-4 font-bold">{order.supplier}</td><td className="px-4 py-4 text-slate-500">{dateLabel(order.date)}</td><td className="px-4 py-4 text-slate-500">{order.lines}</td><td className="px-4 py-4 font-bold">{currency(order.total)}</td>
-          <td className="px-4 py-4"><OrderBadge status={order.status} t={t} /></td><td className="px-4 py-4"><div className="flex gap-2">
-            {['Pending approval', 'Draft'].includes(order.status) && hasRole('ADMIN') && <><button onClick={() => approveOrder(order)} className="rounded-lg bg-green-50 px-2 py-1.5 text-[10px] font-bold text-forest">{t('approve')}</button><button onClick={() => setModal({ type: 'reviewReason', item: order, onSave: rejectOrder })} className="rounded-lg bg-rose-50 px-2 py-1.5 text-[10px] font-bold text-rose-700">{t('reject')}</button></>}
-            {order.status === 'Approved' && hasRole('ADMIN', 'PURCHASING') && <button onClick={() => sendOrder(order)} className="rounded-lg bg-sky-50 px-3 py-1.5 text-[11px] font-bold text-sky-700">{t('send')}</button>}
-            {['Sent', 'Partially received'].includes(order.status) && hasRole('ADMIN', 'STOREKEEPER') && <button onClick={() => setModal({ type: 'purchaseReceipt', order })} className="rounded-lg bg-green-50 px-3 py-1.5 text-[11px] font-bold text-forest">{t('receive')}</button>}
-          </div></td>
-        </tr>)}</tbody>
-      </table>{!orders.length && <Empty text={t('noResults')} />}</div>
-    </div>
+    <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 className="font-extrabold">{t('vatRates')}</h2>{hasRole('ADMIN') && <button onClick={() => setModal({ type: 'vatRate' })} className="rounded-xl border border-forest px-3 py-2 text-xs font-bold text-forest">{t('addVatRate')}</button>}</div>
+      <p className="mb-4 text-xs text-slate-500">{t('vatNotApplied')}</p>
+      <div className="space-y-2">{vatRates.map((rate) => <div key={rate.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-xs dark:bg-slate-700/50">
+        <b>{rate.name} · {Number(rate.percentage)}%</b><span>{dateLabel(rate.effectiveFrom)} – {rate.effectiveTo ? dateLabel(rate.effectiveTo) : '—'}</span>
+        {hasRole('ADMIN') && new Date(rate.effectiveFrom) > new Date() && <button onClick={() => setModal({ type: 'vatRate', item: rate })} className="font-bold text-forest">{t('edit')}</button>}
+      </div>)}</div>
+      {!vatRates.length && <Empty text={t('noResults')} />}
+    </section>
   </div>;
-
-  const renderSales = () => {
-    const totalCredits = customers.reduce((sum, customer) => sum + customer.credit, 0);
-    const ownSession = cashSessions.find((session) => session.userId === user.id && !session.closedAt);
-    const activeSessions = cashSessions.filter((session) => !session.closedAt);
-    return <div className="space-y-5">
-      <PageHeading title={t('sales')} subtitle={`${customers.length} ${t('customers')} · ${sales.length} ${t('salesUnit')}`} action={hasRole('ADMIN', 'SELLER') && <button onClick={() => setModal({ type: 'sale' })} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><Plus size={17} />{t('newSale')}</button>} />
-      <div className="grid gap-4 sm:grid-cols-3"><MiniStat title={t('customers')} value={customers.length} icon={Users} /><MiniStat title={t('sales')} value={sales.length} icon={ShoppingBag} /><MiniStat title={t('creditBalance')} value={currency(totalCredits)} icon={CreditCard} /></div>
-      {hasRole('ADMIN', 'SELLER', 'ACCOUNTANT') && <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <div><h2 className="font-extrabold">{t('cashSession')}</h2>{ownSession
-          ? <p className="mt-1 text-xs text-slate-500">{t('activeSession')} · {t('expectedCash')}: {currency(ownSession.expectedCash)}</p>
-          : <p className="mt-1 text-xs text-slate-500">{hasRole('SELLER', 'ADMIN') ? t('noCashSession') : `${activeSessions.length} ${t('activeSession')}`}</p>}
-        </div>
-        {ownSession && hasRole('ADMIN', 'SELLER')
-          ? <button onClick={() => setModal({ type: 'closeCashSession', session: ownSession })} className="rounded-xl bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800">{t('closeCashSession')}</button>
-          : !ownSession && hasRole('ADMIN', 'SELLER')
-            ? <button onClick={() => setModal({ type: 'openCashSession' })} className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white">{t('openCashSession')}</button>
-            : null}
-      </section>}
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800 xl:col-span-2">
-          <h2 className="mb-4 font-extrabold text-slate-800 dark:text-white">آخر المبيعات</h2>
-          <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-right text-xs">
-            <thead className="bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-700/70"><tr>{[t('reference'), t('customer'), t('date'), t('total'), t('paidAmount'), t('remaining'), t('payment'), t('actions')].map((label) => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">{sales.map((sale) => <tr key={sale.recordId}>
-              <td className="px-3 py-4 font-extrabold text-forest" dir="ltr">{sale.code || sale.id}</td>
-              <td className="px-3 py-4 font-bold text-slate-700 dark:text-slate-100">{sale.customer}</td>
-              <td className="px-3 py-4 text-slate-500">{dateLabel(sale.date)}</td>
-              <td className="px-3 py-4 font-bold">{currency(sale.total - sale.returnedAmount)}</td>
-              <td className="px-3 py-4 text-slate-500">{currency(sale.paidAmount)}</td>
-              <td className="px-3 py-4 font-bold text-amber-700">{currency(sale.balance)}</td>
-              <td className="px-3 py-4"><Badge tone={sale.approvalStatus === 'PENDING' ? 'blue' : sale.approvalStatus === 'REJECTED' ? 'red' : sale.payment === 'paid' ? 'green' : 'amber'}>{sale.approvalStatus === 'PENDING' ? t('pendingCredit') : sale.approvalStatus === 'REJECTED' ? t('rejected') : sale.payment === 'paid' ? t('paid') : t('credit')}</Badge></td>
-              <td className="px-3 py-4"><div className="flex flex-wrap gap-1">
-                {sale.approvalStatus === 'PENDING' && hasRole('ADMIN') && <><button onClick={() => approveCreditSale(sale)} className="rounded-lg bg-green-50 px-2 py-1.5 text-[10px] font-bold text-forest">{t('approveCredit')}</button><button onClick={() => setModal({ type: 'reviewReason', item: sale, onSave: rejectCreditSale })} className="rounded-lg bg-rose-50 px-2 py-1.5 text-[10px] font-bold text-rose-700">{t('rejectCredit')}</button></>}
-                {sale.approvalStatus === 'APPROVED' && <><button onClick={() => setPrintDocument({ sale, kind: 'receipt' })} className="rounded-lg bg-slate-100 px-2 py-1.5 text-[10px] font-bold">{t('receipt')}</button><button onClick={() => setPrintDocument({ sale, kind: 'invoice' })} className="rounded-lg bg-slate-100 px-2 py-1.5 text-[10px] font-bold">{t('invoice')}</button></>}
-                {sale.approvalStatus === 'APPROVED' && sale.returnedAmount < sale.total && hasRole('ADMIN', 'SELLER') && <button onClick={() => setModal({ type: 'salesReturn', sale })} className="rounded-lg bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-800">{t('requestReturn')}</button>}
-              </div></td>
-            </tr>)}</tbody>
-          </table>{!sales.length && <Empty text={t('noResults')} />}</div>
-        </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-          <h2 className="mb-4 font-extrabold text-slate-800 dark:text-white">{t('customers')}</h2>
-          <div className="max-h-[450px] space-y-3 overflow-auto">{customers.map((customer) => <div key={customer.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-100 text-forest"><UserRound size={17} /></div>
-            <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-700 dark:text-slate-100">{customer.name}</p><p className="text-[10px] text-slate-400">{customerTypeLabel(customer.type, t)}</p>
-              {paymentHistoryFor === customer.id && customer.payments?.length > 0 && <div className="mt-2 space-y-1 border-t border-slate-200 pt-2 dark:border-slate-600">{customer.payments.slice(0, 5).map((payment) => <div key={payment.id} className="flex justify-between gap-2 text-[10px] text-slate-500"><span>{new Date(payment.receivedAt).toLocaleDateString(language === 'fr' ? 'fr-TN' : 'ar-TN')}{payment.method ? ` · ${payment.method}` : ''}{payment.reference ? ` · ${payment.reference}` : ''}{payment.note ? ` · ${payment.note}` : ''}</span><b className="shrink-0 text-forest">{currency(payment.amount)}</b></div>)}</div>}
-            </div>
-            {customer.credit > 0 && <div className="text-end"><span className="block text-[10px] font-bold text-amber-700">{currency(customer.credit)}</span>{hasRole('ADMIN', 'SELLER', 'ACCOUNTANT') && <button onClick={() => setModal({ type: 'payment', customer })} className="mt-1 block text-[10px] font-bold text-forest">{t('collectPayment')}</button>}</div>}
-            {customer.payments?.length > 0 && <button onClick={() => setPaymentHistoryFor((current) => current === customer.id ? null : customer.id)} className="shrink-0 text-[10px] font-bold text-slate-500">{t('paymentHistory')} ({customer.payments.length})</button>}
-          </div>)}</div>
-        </div>
-      </div>
-    </div>;
-  };
-
-  const renderReturns = () => <div className="space-y-5">
-    <PageHeading title={t('returnRequests')} subtitle={`${salesReturns.length} ${t('returnRequests')}`} />
-    <div className="grid gap-4 lg:grid-cols-2">{salesReturns.map((item) => <section key={item.id} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-extrabold text-forest" dir="ltr">{item.code} · {item.saleCode}</h2>{item.customer && <p className="mt-1 text-xs text-slate-500">{item.customer}</p>}</div><Badge tone={item.status === 'APPROVED' ? 'blue' : item.status === 'REJECTED' ? 'red' : item.status === 'COMPLETED' ? 'green' : 'amber'}>{item.status === 'APPROVED' ? t('approved') : item.status === 'REJECTED' ? t('rejected') : item.status === 'COMPLETED' ? t('returnCompleted') : t('pending')}</Badge></div>
-      <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">{item.reason}</p>
-      <ul className="mt-3 space-y-1 text-xs text-slate-500">{item.lines.map((line) => <li key={line.id}>{line.productName} · {line.quantity} · {t('restockQuantity')}: {line.restockedQuantity ?? '—'}</li>)}</ul>
-      {item.reviewNote && <p className="mt-2 text-xs text-rose-700">{item.reviewNote}</p>}
-      <div className="mt-4 flex gap-2">{item.status === 'PENDING' && hasRole('ADMIN') && <><button onClick={() => approveSalesReturn(item)} className="rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-forest">{t('approve')}</button><button onClick={() => setModal({ type: 'reviewReason', item, onSave: rejectSalesReturn })} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{t('reject')}</button></>}{item.status === 'APPROVED' && hasRole('ADMIN', 'STOREKEEPER') && <button onClick={() => setModal({ type: 'verifyReturn', item })} className="rounded-lg bg-forest px-3 py-2 text-xs font-bold text-white">{t('verifyReturn')}</button>}</div>
-    </section>)}</div>
-    {!salesReturns.length && <Empty text={t('noResults')} />}
-  </div>;
-
-  const renderAlerts = () => {
-    const alerts = [
-      ...products.filter((p) => getQty(p.id) === 0).map((p) => ({ id: `out-${p.id}`, title: `نفد المخزون: ${p.nameAr}`, detail: `${p.location} · الحد الأدنى ${p.minimum}`, tone: 'red', action: true })),
-      ...lowProducts.filter((p) => getQty(p.id) > 0).map((p) => ({ id: `low-${p.id}`, title: `مخزون منخفض: ${p.nameAr}`, detail: `المتاح ${getQty(p.id)} فقط · الحد الأدنى ${p.minimum}`, tone: 'amber', action: true })),
-      ...batches.filter((b) => b.stage !== 'ready' && (new Date(`${b.readyDate}T00:00:00`) - new Date()) / 86400000 < 10).map((b) => ({ id: `batch-${b.id}`, title: `${t('readySoon')}: ${b.seed}`, detail: `${b.id} · ${dateLabel(b.readyDate)}`, tone: 'blue' })),
-      ...(monthlyLoss > 8 ? [{ id: 'loss-rate', title: t('highLoss'), detail: `${monthlyLoss} شتلة تالفة أو مفقودة هذا الشهر`, tone: 'red' }] : []),
-    ];
-    return <div className="space-y-5"><PageHeading title={t('alerts')} subtitle={`${alerts.length} تنبيهات تحتاج إلى متابعة`} action={hasRole('ADMIN', 'PURCHASING') && <button onClick={() => setModal({ type: 'order' })} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><ShoppingCart size={16} />{t('purchaseShortcut')}</button>} />
-      <div className="grid gap-4 lg:grid-cols-2">{alerts.map((alert) => <div key={alert.id} className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${alert.tone === 'red' ? 'bg-rose-50 text-rose-600' : alert.tone === 'amber' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}><AlertTriangle size={19} /></div><div className="min-w-0 flex-1"><p className="font-extrabold text-slate-800 dark:text-white">{alert.title}</p><p className="mt-1 text-xs text-slate-500">{alert.detail}</p></div>{alert.action && hasRole('ADMIN', 'PURCHASING') && <button onClick={() => setModal({ type: 'order' })} className="shrink-0 rounded-lg bg-green-50 px-3 py-2 text-[10px] font-extrabold text-forest">{t('newOrder')}</button>}</div>)}
-      {!alerts.length && <div className="col-span-full rounded-2xl bg-white p-12 text-center shadow-card dark:bg-slate-800"><Check size={30} className="mx-auto text-forest" /><p className="mt-3 font-bold text-slate-600">لا توجد تنبيهات نشطة حالياً</p></div>}</div>
-    </div>;
-  };
-
-  const renderReports = () => {
-    const report = reportData;
-    const downloadExcelCsv = () => {
-      if (!report) return;
-      const csvRows = [
-        ['Report', 'Date', 'SKU', 'Product', 'Category', 'Customer', 'Quantity', 'Minimum stock', 'Amount (TND)', 'Details'],
-        ...report.inventory.map((item) => ['Inventory', '', item.sku, item.nameAr, item.categoryAr, '', item.quantity, item.minimum, item.stockValue, `${item.size} · ${item.location}`]),
-        ...report.salesByDay.map((item) => ['Daily sales', item.date, '', '', '', '', item.count, '', item.total, 'Sale count']),
-        ...report.salesByCustomer.map((item) => ['Sales by customer', '', '', '', '', item.customer, item.count, '', item.total, 'Sale count']),
-        ...report.salesByProduct.map((item) => ['Sales by product', '', item.sku, item.productAr, '', '', item.quantity, '', item.total, '']),
-        ...report.losses.map((item) => ['Loss', item.date, item.sku, item.productAr, '', '', item.quantity, '', '', item.reason]),
-        ...(report.expensesByCategory || []).map((item) => ['Approved expense', report.from, '', '', item.category, '', item.count, '', item.amount, 'Expense category total']),
-        ['Customer collections', report.from, '', '', '', '', '', '', report.summary.customerCollections || 0, 'Includes all payment methods'],
-        ['Supplier payments', report.from, '', '', '', '', '', '', report.summary.supplierPayments || 0, 'Includes all payment methods'],
-        ['Cash in', report.from, '', '', '', '', '', '', report.summary.cashIn || 0, 'Cash ledger inflows'],
-        ['Cash out', report.from, '', '', '', '', '', '', report.summary.cashOut || 0, 'Cash ledger outflows'],
-        ['Supplier payables outstanding', report.to, '', '', '', '', '', '', report.summary.supplierPayableOutstanding || 0, 'Reviewed amount-bearing invoices only'],
-        ['Expense payables outstanding', report.to, '', '', '', '', '', '', report.summary.expensePayableOutstanding || 0, 'Approved expenses only'],
-      ];
-      downloadCsv(`inventory-${report.from}-${report.to}.csv`, csvRows);
-    };
-    const printPdf = () => {
-      if (!report) return;
-      const popup = window.open('', '_blank');
-      if (!popup) {
-        notify(isRtl ? 'اسمح بالنوافذ المنبثقة لطباعة التقرير' : 'Autorisez les fenêtres pop-up pour imprimer le rapport');
-        return;
-      }
-      popup.document.write(buildReportPrintHtml(report, isRtl));
-      popup.document.close();
-      popup.focus();
-      window.setTimeout(() => popup.print(), 250);
-    };
-    return <div className="space-y-5">
-      <PageHeading title={t('reports')} subtitle={`${report?.from || reportFrom} – ${report?.to || reportTo}`} action={<div className="flex flex-wrap gap-2">
-        <button disabled={!report} onClick={downloadExcelCsv} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"><FileSpreadsheet size={16} className="text-green-700" />{t('exportCsv')}</button>
-        <button disabled={!report} onClick={printPdf} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-white"><Download size={15} />{t('exportPdf')}</button>
-      </div>} />
-      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <Field label={t('reportFrom')}><input type="date" value={reportFrom} max={reportTo} onChange={(event) => setReportFrom(event.target.value)} className={inputClass} /></Field>
-        <Field label={t('reportTo')}><input type="date" value={reportTo} min={reportFrom} onChange={(event) => setReportTo(event.target.value)} className={inputClass} /></Field>
-      </div>
-      {reportError && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{t('reportError')}: {reportError}</p>}
-      {!report && !reportError && <p role="status" className="rounded-xl bg-green-50 px-4 py-3 text-sm font-bold text-forest">{t('reportLoading')}</p>}
-      {report && <>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MiniStat title={t('reportSales')} value={currency(report.summary.salesTotal)} icon={Activity} />
-          <MiniStat title={t('reportCount')} value={report.summary.salesCount} icon={ShoppingBag} />
-          <MiniStat title={t('reportStock')} value={currency(report.summary.inventoryValue)} icon={Package} />
-          <MiniStat title={t('reportCredit')} value={currency(report.summary.creditOutstanding)} icon={CreditCard} />
-          <MiniStat title={t('customerCollections')} value={currency(report.summary.customerCollections || 0)} icon={CreditCard} />
-          <MiniStat title={t('approvedExpenses')} value={currency(report.summary.approvedExpenses || 0)} icon={Wallet} />
-          <MiniStat title={t('supplierPayable')} value={currency(report.summary.supplierPayableOutstanding || 0)} icon={Truck} />
-          <MiniStat title={t('cashNet')} value={currency(report.summary.cashNet || 0)} icon={Wallet} />
-          <MiniStat title={t('expensePayable')} value={currency(report.summary.expensePayableOutstanding || 0)} icon={Wallet} />
-          <MiniStat title={t('cashVarianceTotal')} value={currency(report.summary.cashVarianceTotal || 0)} icon={Activity} />
-        </div>
-        <p className="rounded-xl bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-950">{report.summary.financialReportNotice || t('accountingNotice')}</p>
-        <div className="grid gap-4 xl:grid-cols-2">
-          <ReportTable title={t('reportInventory')} headers={[t('product'), t('category'), t('quantity'), t('minimum'), t('stockValue')]} rows={report.inventory.map((item) => [isRtl ? item.nameAr : item.nameFr, categoryLabel(isRtl ? item.categoryAr : item.categoryFr), item.quantity, item.minimum, currency(item.stockValue)])} t={t} />
-          <ReportTable title={t('customerSales')} headers={[t('customer'), t('reportCount'), t('total')]} rows={report.salesByCustomer.map((item) => [item.customer, item.count, currency(item.total)])} t={t} />
-          <ReportTable title={t('bestSellers')} headers={[t('date'), t('reportCount'), t('total')]} rows={report.salesByDay.map((item) => [item.date, item.count, currency(item.total)])} t={t} />
-          <ReportTable title={t('lossReport')} headers={[t('reason'), t('quantity'), t('reportCount')]} rows={report.lossesByReason.map((item) => [item.reason, item.quantity, item.entries])} t={t} />
-          <ReportTable title={isRtl ? 'الأكثر مبيعاً حسب المنتج' : 'Ventes par produit'} headers={[t('product'), t('quantity'), t('total')]} rows={report.salesByProduct.map((item) => [isRtl ? item.productAr : item.productFr, item.quantity, currency(item.total)])} t={t} />
-          <ReportTable title={t('expenses')} headers={[t('expenseCategory'), t('reportCount'), t('total')]} rows={(report.expensesByCategory || []).map((item) => [item.category, item.count, currency(item.amount)])} t={t} />
-        </div>
-      </>}
-    </div>;
-  };
-  const renderAccounting = () => {
-    const closedSessions = cashSessions.filter((session) => session.closedAt);
-    const sessionVariance = (session) => Number(session.variance || 0);
-    const supplierInvoiceBalance = (invoice) => Math.max(
-      0,
-      Number(invoice.totalAmount || 0) - (invoice.payments || []).reduce((sum, payment) => sum + Number(payment.amount), 0),
-    );
-    return <div className="space-y-5">
-      <PageHeading
-        title={t('accounting')}
-        subtitle={t('accountingNotice')}
-        action={hasRole('ACCOUNTANT') && <button onClick={() => setModal({ type: 'expense' })} className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-white"><Plus size={17} />{t('recordExpense')}</button>}
-      />
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-950">{t('accountingNotice')}</div>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-          <h2 className="mb-4 font-extrabold">{t('expenses')}</h2>
-          <div className="space-y-3">{expenses.map((expense) => <div key={expense.id} className="rounded-xl border border-slate-100 p-4 dark:border-slate-700">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><b>{expense.category} · {currency(expense.amount)}</b><p className="mt-1 text-xs text-slate-500">{expense.description} · {dateLabel(expense.incurredAt)}</p>
-                <p className="mt-1 text-xs text-slate-500">{t('supplierBalance')}: {currency(expense.balance)} · {t('paidAmount')}: {currency(expense.paid)}</p></div>
-              <Badge tone={expense.status === 'APPROVED' ? 'green' : expense.status === 'REJECTED' ? 'red' : 'amber'}>{t(expense.status === 'PENDING_APPROVAL' ? 'pendingApproval' : expense.status.toLowerCase())}</Badge>
-            </div>
-            {expense.status === 'PENDING_APPROVAL' && hasRole('ADMIN') && <div className="mt-3 flex gap-2">
-              <button onClick={() => approveExpense(expense)} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs font-bold text-forest">{t('approveExpense')}</button>
-              <button onClick={() => setModal({ type: 'reviewReason', item: expense, onSave: rejectExpense })} className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700">{t('rejectExpense')}</button>
-            </div>}
-            {expense.status === 'APPROVED' && expense.balance > 0 && hasRole('ACCOUNTANT') && <button onClick={() => setModal({ type: 'accountingPayment', document: expense, documentType: 'expense' })} className="mt-3 rounded-lg bg-forest px-3 py-1.5 text-xs font-bold text-white">{t('payExpense')}</button>}
-          </div>)}</div>
-          {!expenses.length && <Empty text={t('noResults')} />}
-        </section>
-        <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-          <h2 className="mb-4 font-extrabold">{t('supplierInvoices')}</h2>
-          <div className="space-y-3">{supplierInvoices.map((invoice) => {
-            const balance = invoice.totalAmount === null ? null : supplierInvoiceBalance(invoice);
-            return <div key={invoice.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-4 dark:border-slate-700">
-              <div><b>{invoice.supplier.name} · <span dir="ltr">{invoice.reference}</span></b>
-                <p className="mt-1 text-xs text-slate-500">{invoice.totalAmount === null ? t('invoiceBalanceUnknown') : `${t('invoiceAmount')}: ${currency(invoice.totalAmount)} · ${t('supplierBalance')}: ${currency(balance)}`}</p></div>
-              <div className="flex items-center gap-2"><Badge tone={invoice.status === 'REVIEWED' ? 'green' : 'amber'}>{t(invoice.status.toLowerCase())}</Badge>
-                {invoice.status === 'REVIEWED' && balance > 0 && hasRole('ACCOUNTANT') && <button onClick={() => setModal({ type: 'accountingPayment', document: { ...invoice, balance }, documentType: 'supplier' })} className="rounded-lg bg-forest px-3 py-1.5 text-xs font-bold text-white">{t('payInvoice')}</button>}
-              </div>
-            </div>;
-          })}</div>
-          {!supplierInvoices.length && <Empty text={t('noResults')} />}
-        </section>
-      </div>
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="mb-4 font-extrabold">{t('cashReview')}</h2>
-        <div className="space-y-3">{closedSessions.map((session) => <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-4 dark:border-slate-700">
-          <div><b>{session.user.name} · {dateLabel(session.closedAt)}</b><p className="mt-1 text-xs text-slate-500">{t('expectedCash')}: {currency(session.expectedCash)} · {t('closingCash')}: {currency(session.closingCash)} · {t('variance')}: {currency(session.variance)}</p>
-            {session.reviewedAt && <p className="mt-1 text-xs text-slate-500">{t('reviewCashSession')}: {session.reviewedBy?.name || '—'}</p>}</div>
-          <div className="flex flex-wrap gap-2">
-            {!session.reviewedAt && hasRole('ACCOUNTANT') && <button onClick={() => reviewCashSession(session)} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">{t('reviewCashSession')}</button>}
-            {session.reviewedAt && sessionVariance(session) !== 0 && !session.varianceApprovedAt && hasRole('ADMIN') && <button onClick={() => approveCashVariance(session)} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">{t('approveVariance')}</button>}
-            {session.varianceApprovedAt && <Badge tone="green">{t('approveVariance')}</Badge>}
-          </div>
-        </div>)}</div>
-        {!closedSessions.length && <Empty text={t('noResults')} />}
-      </section>
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 className="font-extrabold">{t('vatRates')}</h2>{hasRole('ADMIN') && <button onClick={() => setModal({ type: 'vatRate' })} className="rounded-xl border border-forest px-3 py-2 text-xs font-bold text-forest">{t('addVatRate')}</button>}</div>
-        <p className="mb-4 text-xs text-slate-500">{t('vatNotApplied')}</p>
-        <div className="space-y-2">{vatRates.map((rate) => <div key={rate.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-xs dark:bg-slate-700/50">
-          <b>{rate.name} · {Number(rate.percentage)}%</b><span>{dateLabel(rate.effectiveFrom)} – {rate.effectiveTo ? dateLabel(rate.effectiveTo) : '—'}</span>
-          {hasRole('ADMIN') && new Date(rate.effectiveFrom) > new Date() && <button onClick={() => setModal({ type: 'vatRate', item: rate })} className="font-bold text-forest">{t('edit')}</button>}
-        </div>)}</div>
-        {!vatRates.length && <Empty text={t('noResults')} />}
-      </section>
-    </div>;
-  };
-
   const renderUsers = () => {
     if (user.role !== 'ADMIN') return <PageHeading title={t('users')} subtitle={t('permission')} />;
     const roleLabel = {
@@ -1800,7 +1588,7 @@ export default function App() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Object.entries(roleLabel).map(([role, label]) => <MiniStat key={role} title={label} value={users.filter((item) => item.role === role && item.active).length} icon={Users} />)}</div>
       <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800">
         <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-right text-xs">
-          <thead className="bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-700/70"><tr>{[t('userName'), t('userEmail'), t('role'), t('status'), t('createdAt'), t('userActions')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
+          <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 dark:bg-slate-700/70"><tr>{[t('userName'), t('userEmail'), t('role'), t('status'), t('createdAt'), t('userActions')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-700">{users.map((item) => <tr key={item.id}>
             <td className="px-4 py-4 font-bold text-slate-700 dark:text-slate-100">{item.name}</td>
             <td className="px-4 py-4 text-slate-500" dir="ltr">{item.email}</td>
@@ -1915,6 +1703,21 @@ export default function App() {
     {modal?.type === 'payment' && <SalePaymentForm customer={modal.customer} cashSessions={cashSessions} user={user} t={t} onClose={() => setModal(null)} onSave={submitSalePayment} />}
     {modal?.type === 'userEdit' && <UserForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={saveUser} />}
     {modal?.type === 'userPassword' && <UserPasswordForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={resetUserPassword} />}
+    {modal?.type === 'sale' && <SaleForm products={products} customers={customers} getQty={getQty} t={t} onClose={() => setModal(null)} onSave={submitSale} />}
+    {modal?.type === 'batch' && <BatchForm products={products} t={t} onClose={() => setModal(null)} onSave={createBatch} />}
+    {modal?.type === 'order' && <OrderForm initialProductId={modal.productId} suppliers={suppliers} products={products} supplierQuotes={supplierQuotes} t={t} onClose={() => setModal(null)} onSave={createPurchaseOrder} />}
+    {modal?.type === 'supplier' && <SupplierForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={saveSupplier} />}
+    {modal?.type === 'supplierQuote' && <SupplierQuoteForm suppliers={suppliers} products={products} t={t} onClose={() => setModal(null)} onSave={createSupplierQuote} />}
+    {modal?.type === 'supplierInvoice' && <SupplierInvoiceForm suppliers={suppliers} orders={orders} t={t} onClose={() => setModal(null)} onSave={recordSupplierInvoice} />}
+    {modal?.type === 'expense' && <ExpenseForm t={t} onClose={() => setModal(null)} onSave={recordExpense} />}
+    {modal?.type === 'accountingPayment' && <AccountingPaymentForm document={modal.document} documentType={modal.documentType} cashSessions={cashSessions} user={user} t={t} onClose={() => setModal(null)} onSave={submitAccountingPayment} />}
+    {modal?.type === 'vatRate' && <VatRateForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={saveVatRate} />}
+    {modal?.type === 'supplierReturn' && <SupplierReturnForm suppliers={suppliers} products={products} orders={orders} t={t} onClose={() => setModal(null)} onSave={createSupplierReturn} />}
+    {modal?.type === 'purchaseReceipt' && <PurchaseReceiptForm order={modal.order} t={t} onClose={() => setModal(null)} onSave={(receipt) => receiveOrder(modal.order, receipt)} />}
+    {modal?.type === 'reviewReason' && <ReviewReasonForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={modal.onSave} />}
+    {modal?.type === 'payment' && <SalePaymentForm customer={modal.customer} cashSessions={cashSessions} user={user} t={t} onClose={() => setModal(null)} onSave={submitSalePayment} />}
+    {modal?.type === 'userEdit' && <UserForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={saveUser} />}
+    {modal?.type === 'userPassword' && <UserPasswordForm item={modal.item} t={t} onClose={() => setModal(null)} onSave={resetUserPassword} />}
     {notice && <div role="status" className="fixed bottom-5 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold text-white shadow-xl"><Check size={16} className="text-green-300" />{notice}</div>}
   </div>;
 }
@@ -1963,10 +1766,12 @@ function buildReportPrintHtml(report, isRtl) {
     <div>${isRtl ? 'الرصيد الآجل' : 'Crédit restant'}<strong>${Number(report.summary.creditOutstanding).toFixed(3)} TND</strong></div>
     <div>${isRtl ? 'وحدات الفاقد' : 'Pertes (unités)'}<strong>${report.summary.lossUnits}</strong></div>
   </div>
-  ${table(isRtl ? 'المخزون الحالي' : 'Stock actuel', [isRtl ? 'المنتج' : 'Produit', 'SKU', isRtl ? 'الكمية' : 'Quantité', isRtl ? 'الحد الأدنى' : 'Minimum', isRtl ? 'قيمة المخزون' : 'Valeur'], inventory)}
+  ${table(isRtl ? 'المخزون الحالي' : 'Stock actuel', [isRtl ? 'المنتج' : 'Produit', 'SKU', isRtl ? 'الكمية' : 'Quantité', isRtl ? 'الحد الأدنى' : 'Valeur', isRtl ? 'قيمة المخزون' : 'Valeur'], inventory)}
   ${table(isRtl ? 'المبيعات حسب العميل' : 'Ventes par client', [isRtl ? 'العميل' : 'Client', isRtl ? 'عدد المبيعات' : 'Ventes', isRtl ? 'الإجمالي' : 'Total'], customers)}
   ${table(isRtl ? 'المبيعات اليومية' : 'Ventes quotidiennes', [isRtl ? 'التاريخ' : 'Date', isRtl ? 'عدد المبيعات' : 'Ventes', isRtl ? 'الإجمالي' : 'Total'], daily)}
   ${table(isRtl ? 'الخسائر حسب السبب' : 'Pertes par motif', [isRtl ? 'السبب' : 'Motif', isRtl ? 'الكمية' : 'Quantité', isRtl ? 'العمليات' : 'Opérations'], losses)}
+  ${table(isRtl ? 'المبيعات الأكثر' : 'Meilleures ventes', [isRtl ? 'المنتج' : 'Produit', isRtl ? 'الكمية' : 'Quantité', isRtl ? 'الإجمالي' : 'Total'], report.salesByProduct.map((item) => [isRtl ? item.productAr : item.productFr, item.quantity, currency(item.total)]))}
+  ${table(isRtl ? 'المصاريف' : 'Dépenses', [isRtl ? 'الفئة' : 'Catégorie', t('reportCount'), t('total')], (report.expensesByCategory || []).map((item) => [item.category, item.count, currency(item.amount)]))}
   </body></html>`;
 }
 
@@ -2000,10 +1805,10 @@ function Field({ label, children, className = '' }) {
   return <label className={`block ${className}`}><span className="mb-1.5 block text-xs font-bold text-slate-600 dark:text-slate-300">{label}</span>{children}</label>;
 }
 
-const inputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-700 outline-none transition focus:border-green-500 focus:bg-white dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:focus:bg-slate-700';
+const inputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-700 outline-none transition focus:border-green-500 focus:bg-white dark:border-slate-600 dark:bg-slate-700 dark:text-white';
 const selectClass = inputClass;
 function FormActions({ onClose, t, submitLabel, disabled = false }) {
-  return <div className="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-700"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 dark:border-slate-600">{t('cancel')}</button><button type="submit" disabled={disabled} className="rounded-xl bg-forest px-5 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{submitLabel || t('save')}</button></div>;
+  return <div className="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-700"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 dark:border-slate-600">{t('cancel')}</button><button type="submit" disabled={disabled} className="rounded-xl bg-forest px-5 py-2 text-xs font-bold text-white disabled:opacity-50">{submitLabel || t('save')}</button></div>;
 }
 
 function ProductForm({ product, categories, categoryLabel, t, onClose, onSave }) {
@@ -2104,11 +1909,11 @@ function MovementForm({ products, productById, getQty, seedType, t, onClose, onS
 }
 
 function SalePaymentForm({ customer, cashSessions, user, t, onClose, onSave }) {
+  const activeSessions = cashSessions.filter((session) => !session.closedAt);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [method, setMethod] = useState('CASH');
   const [reference, setReference] = useState('');
-  const activeSessions = cashSessions.filter((session) => !session.closedAt);
   const [cashSessionId, setCashSessionId] = useState(() => (
     cashSessions.find((session) => session.userId === user.id && !session.closedAt)?.id || activeSessions[0]?.id || ''
   ));
@@ -2236,7 +2041,7 @@ function SalesReturnForm({ sale, t, onClose, onSave }) {
     }}>
       <Field label={t('returnReason')}><input required maxLength="500" value={reason} onChange={(event) => setReason(event.target.value)} className={inputClass} /></Field>
       <div className="mt-4 space-y-3">{quantities.map((line, index) => <div key={line.productId} className="grid grid-cols-[1fr_150px] items-end gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50">
-        <div><p className="text-xs font-bold">{line.productName}</p><p className="mt-1 text-[10px] text-slate-500">{t('quantityAvailable')}: {line.remaining}</p></div>
+        <div><p className="text-xs font-bold">{line.productName}</p><p className="mt-1 text-[10px] text-slate-500">{t('quantityAvailable')}: {line.remaining} · {t('minimum')}: {line.remaining < line.quantity ? line.remaining : line.quantity}</p></div>
         <Field label={t('quantity')}><input type="number" min="0" max={line.remaining} value={line.quantity} onChange={(event) => updateQuantity(index, event.target.value)} className={inputClass} /></Field>
       </div>)}</div>
       <FormActions onClose={onClose} t={t} submitLabel={t('requestReturn')} disabled={!quantities.some((line) => line.quantity > 0)} />
@@ -2324,9 +2129,17 @@ function SaleForm({ products, customers, getQty, t, onClose, onSave }) {
   return <Modal title={t('newSale')} onClose={onClose} wide><form onSubmit={(event) => { event.preventDefault(); onSave({ customerId, payment, lines }); }}><div className="grid gap-4 sm:grid-cols-2">
     <Field label={t('customer')}><select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className={selectClass}><option value="">{t('selectCustomer')}</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name} · {customer.type}</option>)}</select></Field>
     <Field label={t('payment')}><select value={payment} onChange={(e) => setPayment(e.target.value)} className={selectClass}><option value="paid">{t('paid')}</option><option value="credit">{t('credit')}</option></select></Field>
-  </div>{payment === 'credit' && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">{t('pendingCredit')}</p>}<div className="mt-5 space-y-3">{lines.map((line, index) => <div key={index} className="grid items-end gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50 sm:grid-cols-[1fr_130px_120px_36px]"><Field label={t('productName')}><select value={line.productId} onChange={(e) => editLine(index, 'productId', e.target.value)} className={selectClass}><option value="">{t('selectProduct')}</option>{products.map((p) => <option key={p.id} value={p.id}>{p.sku} · {p.nameAr} · متاح {getQty(p.id)}</option>)}</select></Field><Field label={t('quantity')}><input type="number" min="1" value={line.quantity} onChange={(e) => editLine(index, 'quantity', e.target.value)} className={inputClass} /></Field><div className="pb-2 text-xs font-extrabold text-forest">{currency(Number(line.quantity || 0) * (products.find((p) => p.id === line.productId)?.salePrice || 0))}</div><IconButton label={t('removeLine')} onClick={() => removeLine(index)}><X size={16} /></IconButton></div>)}</div>
+  </div>{payment === 'credit' && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">{t('pendingCredit')}</p>}<div className="mt-5 space-y-3">{lines.map((line, index) => <div key={index} className="grid items-end gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50 sm:grid-cols-[1fr_110px_1fr_100px_36px]">
+      <Field label={t('productName')}><select required value={line.productId} onChange={(e) => setLines((current) => current.map((item, i) => i === index ? { ...item, productId: e.target.value, supplierQuoteLineId: '' } : item))} className={selectClass}><option value="">{t('selectProduct')}</option>{products.map((item) => <option key={item.id} value={item.id}>{item.nameAr}</option>)}</select></Field>
+      <Field label={t('quantity')}><input required type="number" min="1" value={line.quantity} onChange={(e) => editLine(index, 'quantity', e.target.value)} className={inputClass} /></Field>
+      <Field label={t('selectQuote')}><select value={line.supplierQuoteLineId} onChange={(event) => updateLine(index, 'supplierQuoteLineId', event.target.value)} className={selectClass}><option value="">{t('useProductPrice')}</option>{quoteLines.filter((item) => item.productId === line.productId).map((item) => <option key={item.id} value={item.id}>{item.reference} · {currency(Number(item.unitPrice))}</option>)}</select></Field>
+      <div className="pb-2 text-xs font-extrabold text-forest">{currency(Number(line.quantity || 0) * priceFor(line))}</div>
+      <IconButton label={t('removeLine')} onClick={() => setLines((current) => current.length > 1 ? current.filter((_, i) => i !== index) : current)}><X size={16} /></IconButton>
+    </div>)}</div>
     <button type="button" onClick={addLine} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-forest"><Plus size={15} />{t('addLine')}</button>
-    <div className="mt-4 flex items-center justify-between rounded-xl bg-green-50 px-4 py-3 dark:bg-green-900/20"><span className="text-xs font-bold text-slate-600 dark:text-slate-200">{t('total')}</span><b className="text-lg text-forest">{currency(total)}</b></div><FormActions onClose={onClose} t={t} submitLabel={t('createSale')} /></form></Modal>;
+    <div className="mt-4 flex items-center justify-between rounded-xl bg-green-50 px-4 py-3 dark:bg-green-900/20"><span className="text-xs font-bold text-slate-600 dark:text-slate-200">{t('total')}</span><b className="text-lg text-forest">{currency(total)}</b></div>
+    <FormActions onClose={onClose} t={t} submitLabel={t('createSale')} />
+  </form></Modal>;
 }
 
 function BatchForm({ products, t, onClose, onSave }) {
