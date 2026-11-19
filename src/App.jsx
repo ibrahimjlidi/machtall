@@ -1310,8 +1310,13 @@ export default function App() {
       (!productCategory || product.category === productCategory) &&
       (!productSize || product.size === productSize) && (!productStatus || status === productStatus);
   });
-  const filteredMovements = movements.filter((m) => (!movementFilter || (movementFilter === 'Adjustment' ? m.type.startsWith('Adjustment') : m.type === movementFilter)) &&
-    (!query || `${m.reference} ${m.reason} ${productById(m.productId)?.nameAr || ''}`.toLowerCase().includes(query.toLowerCase()));
+  const filteredMovements = movements.filter((m) => {
+    const matchesType = !movementFilter || (movementFilter === 'Adjustment'
+      ? m.type.startsWith('Adjustment')
+      : m.type === movementFilter);
+    const haystack = `${m.reference} ${m.reason} ${productById(m.productId)?.nameAr || ''}`.toLowerCase();
+    return matchesType && (!query || haystack.includes(query.toLowerCase()));
+  });
 
   const showMovementModal = (seedType = '') => setModal({ type: 'movement', seedType });
   const firstProductName = (id) => (productById(id)?.[isRtl ? 'nameAr' : 'nameFr'] || productById(id)?.nameAr || '—');
@@ -1358,6 +1363,11 @@ export default function App() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metricCards.map((card, index) => <div key={card.title} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-start justify-between"><span className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.color}`}><card.icon size={20} /></span><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${card.positive ? 'bg-green-50 text-green-700' : 'bg-slate-50 text-slate-500'}`}>{card.positive && <span className="me-1">↗</span>}{card.change}</span></div>
+          <p className="mt-4 text-xs font-semibold text-slate-500">{card.title}</p><p className={`${index === 1 || index === 4 ? 'text-[17px]' : 'text-2xl'} mt-1 font-extrabold text-slate-800 dark:text-white`}>{card.value} <span className="text-xs font-medium text-slate-400">{card.suffix}</span></p>
+        </div>)}
+      </div>
+      <Suspense fallback={<div className="min-h-72 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" aria-busy="true" />}>
+        <DashboardCharts
           flowData={flowData}
           catData={catData}
           salesData={salesData}
@@ -1367,15 +1377,9 @@ export default function App() {
           showStockFlow={hasRole('ADMIN', 'STOREKEEPER', 'ACCOUNTANT')}
           showCategoryValue={hasRole('ADMIN', 'ACCOUNTANT')}
           showSalesTrend={hasRole('ADMIN')}
+          lowStockPanel={lowStockPanel}
         />
       </Suspense>
-      {hasRole('ADMIN', 'STOREKEEPER', 'SELLER', 'PURCHASING', 'VIEWER') && <div className="grid gap-4 xl:grid-cols-5">
-        <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-800 xl:col-span-2">
-          <div className="mb-4 flex items-center justify-between"><h2 className="font-extrabold text-slate-800 dark:text-white">{t('lowStockList')}</h2><button onClick={() => navigate('products')} className="text-xs font-bold text-forest">{t('seeAll')} <ChevronLeft size={13} className="inline" /></button></div>
-          <div className="space-y-3">{lowProducts.slice(0, 5).map((product) => <div key={product.id} className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-50 text-forest"><Leaf size={17} /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200">{firstProductName(product.id)}</p><p className="text-[10px] text-slate-400">{product.location}</p></div><Badge tone={getQty(product.id) === 0 ? 'red' : 'amber'}>{getQty(product.id)} / {product.minimum}</Badge></div>)}
-          {!lowProducts.length && <Empty text={t('noResults')} />}</div>
-        </section>
-      </div>}
       <div className="flex items-center gap-4 overflow-hidden rounded-2xl bg-gradient-to-l from-green-800 to-forest px-5 py-4 text-white shadow-soft"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15"><Sun size={25} /></div><div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{t('seasonalTip')} <span className="text-sun">✦</span></p><p className="mt-1 text-xs leading-6 text-green-50/90">{t('tip')}</p></div><Flower2 size={54} className="hidden shrink-0 text-white/20 sm:block" /></div>
     </div>;
   };
@@ -1516,8 +1520,8 @@ export default function App() {
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span className="flex items-center gap-1"><Building2 size={13} />{supplier.city}</span><span dir="ltr">{supplier.phone}</span></div>
         {supplier.email && <p className="mt-1 text-xs text-slate-500" dir="ltr">{supplier.email}</p>}
         {hasRole('ADMIN', 'PURCHASING') && <div className="mt-3 flex gap-2">
-          <button onClick={() => setModal({ type: 'supplier', item: supplier })} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 dark:bg-slate-700 dark:text-white">{t('edit')}</button>
-          <button onClick={() => archiveSupplier(supplier)} className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700">{t('archive')}</button>
+          <button onClick={() => setModal({ type: 'supplier', item: supplier })} className="rounded-lg bg-slate-100 px-3 py-2 font-bold text-slate-700 dark:bg-slate-700 dark:text-white">{t('edit')}</button>
+          <button onClick={() => archiveSupplier(supplier)} className="rounded-lg bg-rose-50 px-3 py-2 font-bold text-rose-700">{t('archive')}</button>
         </div>}
       </div>)}</div>
       {!suppliers.length && <Empty text={t('noResults')} />}
@@ -1611,7 +1615,7 @@ export default function App() {
     {auditError && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{auditError}</p>}
     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card dark:border-slate-700 dark:bg-slate-800">
       <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-right text-xs">
-        <thead className="bg-slate-50 text-[11px] text-slate-500 dark:bg-slate-700/70"><tr>{[t('date'), t('actor'), t('event'), t('entity'), t('details')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
+        <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 dark:bg-slate-700/70"><tr>{[t('date'), t('actor'), t('event'), t('entity'), t('details')].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">{auditLogs.map((entry) => <tr key={entry.id}>
           <td className="px-4 py-3 text-slate-500">{new Date(entry.createdAt).toLocaleString(language === 'fr' ? 'fr-TN' : 'ar-TN')}</td>
           <td className="px-4 py-3"><b>{entry.actor.name}</b><p className="mt-1 text-slate-400" dir="ltr">{entry.actor.email}</p></td>
@@ -1871,7 +1875,7 @@ function CategoryManager({ categories, t, onClose, onSave, onDelete }) {
       </div>
       {error && <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{error}</p>}
       <div className="mt-4 flex justify-end gap-2">
-        {editing && <button type="button" onClick={() => { setEditing(null); setForm({ nameAr: '', nameFr: '' }); setError(''); }} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500">{t('cancel')}</button>}
+        {editing && <button type="button" onClick={() => { setEditing(null); setForm({ nameAr: '', nameFr: '' }); setError(''); }} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 dark:border-slate-600">{t('cancel')}</button>}
         <button type="submit" disabled={busy} className="rounded-xl bg-forest px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{busy ? t('loading') : editing ? t('save') : t('addCategory')}</button>
       </div>
     </form>
@@ -2041,8 +2045,9 @@ function SalesReturnForm({ sale, t, onClose, onSave }) {
     }}>
       <Field label={t('returnReason')}><input required maxLength="500" value={reason} onChange={(event) => setReason(event.target.value)} className={inputClass} /></Field>
       <div className="mt-4 space-y-3">{quantities.map((line, index) => <div key={line.productId} className="grid grid-cols-[1fr_150px] items-end gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50">
-        <div><p className="text-xs font-bold">{line.productName}</p><p className="mt-1 text-[10px] text-slate-500">{t('quantityAvailable')}: {line.remaining} · {t('minimum')}: {line.remaining < line.quantity ? line.remaining : line.quantity}</p></div>
-        <Field label={t('quantity')}><input type="number" min="0" max={line.remaining} value={line.quantity} onChange={(event) => updateQuantity(index, event.target.value)} className={inputClass} /></Field>
+        <Field label={t('productName')}><select required value={line.productId} onChange={(e) => setQuantities((current) => current.map((item, i) => i === index ? { ...item, productId: e.target.value, supplierQuoteLineId: '' } : item))} className={selectClass}><option value="">{t('selectProduct')}</option>{products.map((item) => <option key={item.id} value={item.id}>{item.nameAr}</option>)}</select></Field>
+        <Field label={t('quantity')}><input required type="number" min="1" value={line.quantity} onChange={(e) => updateQuantity(index, e.target.value)} className={inputClass} /></Field>
+        <IconButton label={t('removeLine')} onClick={() => setQuantities((current) => current.length > 1 ? current.filter((_, i) => i !== index) : current)}><X size={16} /></IconButton>
       </div>)}</div>
       <FormActions onClose={onClose} t={t} submitLabel={t('requestReturn')} disabled={!quantities.some((line) => line.quantity > 0)} />
     </form>
@@ -2059,7 +2064,7 @@ function SalesReturnVerifyForm({ item, t, onClose, onSave }) {
   return <Modal title={`${t('verifyReturn')} · ${item.code}`} onClose={onClose}>
     <form onSubmit={(event) => { event.preventDefault(); onSave({ item, lines: lines.map(({ returnLineId, restockedQuantity }) => ({ returnLineId, restockedQuantity: Number(restockedQuantity) })) }); }}>
       <div className="space-y-3">{lines.map((line, index) => <div key={line.returnLineId} className="grid grid-cols-[1fr_150px] items-end gap-3">
-        <div><p className="text-xs font-bold">{line.productName}</p><p className="mt-1 text-[10px] text-slate-500">{t('quantity')}: {line.quantity}</p></div>
+        <div><p className="text-xs font-bold">{line.productName}</p><p className="mt-1 font-normal text-slate-500">{t('quantity')}: {line.quantity}</p></div>
         <Field label={t('restockQuantity')}><input required type="number" min="0" max={line.quantity} value={line.restockedQuantity} onChange={(event) => setLines((current) => current.map((item, i) => i === index ? { ...item, restockedQuantity: Number(event.target.value) } : item))} className={inputClass} /></Field>
       </div>)}</div>
       <FormActions onClose={onClose} t={t} submitLabel={t('verifyReturn')} />
@@ -2198,7 +2203,7 @@ function ProductionLossForm({ batch, t, onClose, onSave }) {
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
   return <Modal title={t('reportPlantLoss')} onClose={onClose}>
     <form onSubmit={(event) => { event.preventDefault(); onSave({ batch, ...form }); }}>
-      <p className="mb-4 text-xs text-slate-500">{batch.code} · {t('quantityAvailable')}: {maximum}</p>
+      <p className="mb-4 text-xs text-slate-500">{batch.code} · {t('quantity')}: {maximum}</p>
       <div className="grid gap-3">
         <Field label={t('quantity')}><input required type="number" min="1" max={maximum} value={form.quantity} onChange={update('quantity')} className={inputClass} /></Field>
         <Field label={t('lossReason')}><textarea required minLength="3" maxLength="500" value={form.reason} onChange={update('reason')} className={inputClass} /></Field>
@@ -2306,7 +2311,7 @@ function SupplierInvoiceForm({ suppliers, orders, t, onClose, onSave }) {
   const supplierOrders = orders.filter((order) => order.supplierId === supplierId);
   return <Modal title={t('recordInvoice')} onClose={onClose}>
     <form onSubmit={(event) => { event.preventDefault(); onSave({ supplierId, purchaseOrderId, reference, totalAmount, invoiceDate, note }); }}>
-      <p className="mb-4 text-xs text-slate-500">{t('vatNotApplied')}</p>
+      <p className="mb-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-950">{t('vatNotApplied')}</p>
       <div className="grid gap-3">
         <Field label={t('supplier')}><select required value={supplierId} onChange={(event) => { setSupplierId(event.target.value); setPurchaseOrderId(''); }} className={selectClass}><option value="">{t('selectSupplier')}</option>{suppliers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
         <Field label={t('purchaseOrders')}><select value={purchaseOrderId} onChange={(event) => setPurchaseOrderId(event.target.value)} className={selectClass}><option value="">{t('all')}</option>{supplierOrders.map((order) => <option key={order.id} value={order.id}>{order.code}</option>)}</select></Field>
@@ -2331,16 +2336,16 @@ function SupplierReturnForm({ suppliers, products, orders, t, onClose, onSave })
   const updateLine = (index, key, value) => setLines((current) => current.map((line, i) => i === index ? { ...line, [key]: value } : line));
   return <Modal title={t('requestSupplierReturn')} onClose={onClose} wide>
     <form onSubmit={(event) => { event.preventDefault(); onSave({ supplierId, purchaseOrderId, supplierReference, reason, note, lines }); }}>
-      <p className="mb-4 text-xs text-slate-500">{t('noReturnStockPosting')}</p>
+      <p className="mb-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-950">{t('noReturnStockPosting')}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('supplier')}><select required value={supplierId} onChange={(event) => { setSupplierId(event.target.value); setPurchaseOrderId(''); }} className={selectClass}><option value="">{t('selectSupplier')}</option>{suppliers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
         <Field label={t('purchaseOrders')}><select value={purchaseOrderId} onChange={(event) => setPurchaseOrderId(event.target.value)} className={selectClass}><option value="">{t('all')}</option>{supplierOrders.map((order) => <option key={order.id} value={order.id}>{order.code}</option>)}</select></Field>
         <Field label={t('supplierReference')}><input maxLength="120" value={supplierReference} onChange={(event) => setSupplierReference(event.target.value)} className={inputClass} /></Field>
         <Field label={t('returnReason')}><input required minLength="3" maxLength="500" value={reason} onChange={(event) => setReason(event.target.value)} className={inputClass} /></Field>
       </div>
-      <div className="mt-4 space-y-3">{lines.map((line, index) => <div key={index} className="grid items-end gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50 sm:grid-cols-[1fr_130px_36px]">
-        <Field label={t('productName')}><select required value={line.productId} onChange={(event) => updateLine(index, 'productId', event.target.value)} className={selectClass}><option value="">{t('selectProduct')}</option>{products.map((item) => <option key={item.id} value={item.id}>{item.nameAr}</option>)}</select></Field>
-        <Field label={t('quantity')}><input required type="number" min="1" value={line.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} className={inputClass} /></Field>
+      <div className="mt-4 space-y-3">{lines.map((line, index) => <div key={line.productId} className="grid grid-cols-[1fr_150px] items-end gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50">
+        <Field label={t('productName')}><select required value={line.productId} onChange={(e) => setLines((current) => current.map((item, i) => i === index ? { ...item, productId: e.target.value, supplierQuoteLineId: '' } : item))} className={selectClass}><option value="">{t('selectProduct')}</option>{products.map((item) => <option key={item.id} value={item.id}>{item.nameAr}</option>)}</select></Field>
+        <Field label={t('quantity')}><input required type="number" min="1" value={line.quantity} onChange={(e) => updateLine(index, 'quantity', e.target.value)} className={inputClass} /></Field>
         <IconButton label={t('removeLine')} onClick={() => setLines((current) => current.length > 1 ? current.filter((_, i) => i !== index) : current)}><X size={16} /></IconButton>
       </div>)}</div>
       <button type="button" onClick={() => setLines((current) => [...current, { productId: '', quantity: 1 }])} className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-forest"><Plus size={15} />{t('addLine')}</button>
@@ -2401,8 +2406,8 @@ function PurchaseReceiptForm({ order, t, onClose, onSave }) {
       });
     }}>
       <div className="space-y-3">
-        {lines.map((line, index) => <div key={line.id} className="grid gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50 sm:grid-cols-[1fr_100px_100px_110px]">
-          <div className="self-center text-xs font-bold">{line.productName}<p className="mt-1 font-normal text-slate-500">{t('quantity')}: {line.quantity} · {t('receivedQuantity')}: {line.quantity - line.remainingQuantity} · {t('remaining')}: {line.remainingQuantity}</p></div>
+        {lines.map((line, index) => <div key={line.id} className="grid gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50 sm:grid-cols-[1fr_100px_100px_110px_36px]">
+          <div className="self-center text-xs font-bold">{line.productName}<p className="mt-1 font-normal text-slate-500">{t('quantity')}: {line.quantity}</p></div>
           <Field label={t('receivedQuantity')}><input required type="number" min="0" max={line.remainingQuantity} value={line.receivedQuantity} onChange={(event) => updateLine(index, 'receivedQuantity', event.target.value)} className={inputClass} /></Field>
           <Field label={t('damagedQuantity')}><input required type="number" min="0" max={line.receivedQuantity} value={line.damagedQuantity} onChange={(event) => updateLine(index, 'damagedQuantity', event.target.value)} className={inputClass} /></Field>
         </div>)}
@@ -2430,7 +2435,7 @@ function OrderBadge({ status, t }) {
   return <Badge tone={tone}>{label}</Badge>;
 }
 function MiniStat({ title, value, icon: Icon }) {
-  return <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold text-slate-400">{title}</p><p className="mt-2 text-xl font-extrabold text-slate-800 dark:text-white">{value}</p></div><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-forest"><Icon size={19} /></span></div></div>;
+  return <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold text-slate-400">{title}</p><p className="mt-2 text-xl font-extrabold text-slate-800 dark:text-white">{value}</p></div><span className={`flex h-10 w-10 items-center justify-center rounded-xl ${['bg-amber-400', 'bg-sky-400', 'bg-green-500', 'bg-forest'][index]}`}><Icon size={19} /></span></div></div>;
 }
 function customerTypeLabel(type, t) {
   return ({ فرد: t('individual'), بستاني: t('landscaper'), بلدية: t('municipality') })[type] || type;
