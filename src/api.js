@@ -20,7 +20,7 @@ export async function apiRequest(path, { method = 'GET', body, token = getAccess
       Accept: 'application/json',
       ...(body !== undefined && { 'Content-Type': 'application/json' }),
     },
-    credentials: 'same-origin',
+    credentials: 'include',
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
   const payload = response.status === 204 ? null : await response.json().catch(() => null);

@@ -13,14 +13,16 @@ export class AuthController {
   async login(@Body() input: LoginDto, @Res({ passthrough: true }) response: Response) {
     const session = await this.auth.login(input);
     const secure = this.config.get('COOKIE_SECURE') === 'true' ? '; Secure' : '';
-    response.setHeader('Set-Cookie', `mashtal_session=${encodeURIComponent(session.accessToken)}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=28800${secure}`);
+    const sameSite = this.config.get('COOKIE_SAME_SITE') === 'None' ? 'None' : 'Strict';
+    response.setHeader('Set-Cookie', `mashtal_session=${encodeURIComponent(session.accessToken)}; HttpOnly; SameSite=${sameSite}; Path=/api; Max-Age=28800${secure}`);
     return { user: session.user };
   }
 
   @Post('logout')
   logout(@Res({ passthrough: true }) response: Response) {
     const secure = this.config.get('COOKIE_SECURE') === 'true' ? '; Secure' : '';
-    response.setHeader('Set-Cookie', `mashtal_session=; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0${secure}`);
+    const sameSite = this.config.get('COOKIE_SAME_SITE') === 'None' ? 'None' : 'Strict';
+    response.setHeader('Set-Cookie', `mashtal_session=; HttpOnly; SameSite=${sameSite}; Path=/api; Max-Age=0${secure}`);
     return { success: true };
   }
 

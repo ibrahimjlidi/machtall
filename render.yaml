@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: machtall-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run db:generate && npm run api:build && npm run db:migrate
+    startCommand: npm run start --workspace @mashtal/api
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: true
+      - key: COOKIE_SAME_SITE
+        value: None
+      - key: CORS_ORIGIN
+        sync: false
